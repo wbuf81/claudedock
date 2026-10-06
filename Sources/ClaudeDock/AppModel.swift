@@ -34,6 +34,9 @@ final class AppModel: ObservableObject {
     private let store: HistoryStore
     private var gate = AdviceGate()
     private var primaryOverride: String?
+    private var session = SessionWatch()
+    /// Demo data is on screen: real account details must stay out of it.
+    private var showingDemo: Bool { primaryOverride != nil }
     private static let keep: TimeInterval = 35 * 24 * 3600
     /// The pace looks back 3 days and the chart shows one week, so only the last 8 days are
     /// kept in memory (and filtered on every redraw); the file keeps all 35.
@@ -74,7 +77,7 @@ final class AppModel: ObservableObject {
     var statusLine: String {
         SwitchAdvisor.statusLine(statuses, claudeCodeOrg: claudeCodeOrg, advice: advice, now: now,
                                  formatting: formatting, settings.thresholds,
-                                 hidden: settings.knownOrgs.filter { org in !orgs.contains { $0.id == org.id } })
+                                 hidden: showingDemo ? [] : settings.knownOrgs.filter { org in !orgs.contains { $0.id == org.id } })
     }
 
     /// The org list from claude.ai: show the selected orgs, primary first. The first time,
@@ -85,6 +88,7 @@ final class AppModel: ObservableObject {
         if !shown.contains(where: { $0.id == settings.primaryOrg }) {
             settings.primaryOrg = shown.first(where: { $0.id == claudeCodeOrg })?.id ?? shown.first?.id
         }
+        guard !showingDemo else { return }
         orgs = DisplayNames.short(shown).sorted { role(of: $0) == .primary && role(of: $1) != .primary }
     }
 
@@ -97,6 +101,7 @@ final class AppModel: ObservableObject {
         history = Self.recent(history + outcome.readings, now: time)
         try? store.append(outcome.readings)
         signedIn = true
+        session.worked()
         problem = Copy.problem(outcome.failures, shown: orgs.count)
         orgProblems = Dictionary(outcome.failures.map { ($0.org.id, $0.problem) }, uniquingKeysWith: { a, _ in a })
         refreshProblem = outcome.readings.isEmpty ? outcome.failures.first?.problem : nil
@@ -110,15 +115,32 @@ final class AppModel: ObservableObject {
         refreshProblem = problem
     }
 
-    /// claude.ai says the session is over.
+    /// claude.ai says the session is over. Worth a notification only if it worked earlier in
+    /// this run, not when launching signed out.
     func sessionEnded() {
-        guard signedIn else { return }
         signedIn = false
-        onSignedOut?()
+        clearProblems()
+        if session.ended() { onSignedOut?() }
+    }
+
+    /// The owner signed out from the menu.
+    func signedOut() {
+        signedIn = false
+        clearProblems()
+        session = SessionWatch()
+    }
+
+    /// Whether an org's reading is current; an org that stopped reading keeps its last one.
+    func isFresh(_ org: Org) -> Bool { latest[org.id]?.isFresh(now: now) ?? false }
+
+    private func clearProblems() {
+        problem = nil
+        orgProblems = [:]
+        refreshProblem = nil
     }
 
     func setClaudeCodeOrg(_ id: String?) {
-        guard id != claudeCodeOrg else { return }
+        guard id != claudeCodeOrg, !showingDemo else { return }
         claudeCodeOrg = id
         updateAdvice()
     }
@@ -139,6 +161,7 @@ final class AppModel: ObservableObject {
 
     func apply(_ scenario: DemoScenario) {
         primaryOverride = scenario.primary
+        clearProblems()
         orgs = scenario.orgs
         latest = Dictionary(uniqueKeysWithValues: scenario.readings.map { ($0.org, $0) })
         history = []
@@ -151,6 +174,7 @@ final class AppModel: ObservableObject {
 
     func leaveDemo() {
         primaryOverride = nil
+        clearProblems()
         orgs = []
         latest = [:]
         advice = nil

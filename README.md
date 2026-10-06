@@ -117,6 +117,7 @@ an older macOS, it builds and runs with a frosted card instead.
 git clone https://github.com/wbuf81/claudedock.git
 cd claudedock
 ./build.sh                                        # 1–2 minutes the first time; Apple Silicon + Intel
+rm -rf "/Applications/Claude Dock.app"            # an older copy, when updating (quit it first)
 cp -R "build/Claude Dock.app" /Applications/
 open "/Applications/Claude Dock.app"
 ```

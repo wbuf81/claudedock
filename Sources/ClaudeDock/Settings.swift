@@ -37,6 +37,12 @@ final class Settings: ObservableObject {
             ?? Self.load(WidgetOffset.self, "widgetOffset", defaults).map { .free($0) }
         layoutChoice = LayoutChoice(rawValue: defaults.string(forKey: "layoutChoice") ?? "") ?? .automatic
         sizeScale = WidgetLayout.clampSize(defaults.object(forKey: "sizeScale") as? Double ?? 1)
+        // Save the migration once; otherwise it would rerun on every launch against whatever
+        // orgs are known by then, hiding any joined since.
+        if defaults.object(forKey: "shownOrgs") != nil {
+            defaults.set(orgChoices, forKey: "orgChoices")
+            defaults.removeObject(forKey: "shownOrgs")
+        }
     }
 
     /// Whether an org is shown: the owner's choice, or by default every paid org (or every

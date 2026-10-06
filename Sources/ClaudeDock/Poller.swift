@@ -13,6 +13,7 @@ final class Poller {
     private var failures = 0
     private var orgsFetchedAt: Date?
     private var accountModified: Date?
+    private var inFlight: Task<Void, Never>?
     private let delays: [TimeInterval] = [180, 360, 720, 900]
 
     init(model: AppModel, session: ClaudeWebSession, account: ClaudeCodeAccount) {
@@ -48,7 +49,17 @@ final class Poller {
         loop = nil
     }
 
+    /// Refreshes, or waits for the refresh already running (the loop, the Refresh button,
+    /// opening the panel and Settings can all ask at once).
     func refresh() async {
+        if let inFlight { return await inFlight.value }
+        let task = Task { await refreshNow() }
+        inFlight = task
+        await task.value
+        inFlight = nil
+    }
+
+    private func refreshNow() async {
         guard !model.settings.demoMode else { return }
         do {
             if model.orgs.isEmpty || (orgsFetchedAt.map { Date().timeIntervalSince($0) > 86_400 } ?? true) {

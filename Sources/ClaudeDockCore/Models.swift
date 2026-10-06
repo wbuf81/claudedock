@@ -48,6 +48,12 @@ public struct Reading: Codable, Equatable, Sendable {
 
     public var weekLeft: Double { 100 - week }
 
+    /// How long a reading counts as current. Refreshes come every 3 minutes, so an older
+    /// reading means its org has stopped reading.
+    public static let freshFor: TimeInterval = 600
+
+    public func isFresh(now: Date) -> Bool { now.timeIntervalSince(time) <= Self.freshFor }
+
     /// The reading as it stands at `now`: a window whose reset time has passed is empty again.
     public func adjusted(to now: Date) -> Reading {
         var r = self

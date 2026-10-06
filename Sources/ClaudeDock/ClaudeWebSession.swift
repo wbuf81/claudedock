@@ -11,7 +11,7 @@ import ClaudeDockCore
 /// site scripts run all day. If the site's bot check blocks requests from it, the full
 /// usage page (which can pass the check) is used instead until the app restarts.
 @MainActor
-final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
+final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
     var onSignedIn: (() -> Void)?
 
     private static let lightHome = URL(string: "https://claude.ai/robots.txt")!
@@ -115,7 +115,7 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
     @objc private func openCopiedLink() {
         let text = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard let url = URL(string: text), url.scheme == "https",
-              let host = url.host, host == "claude.ai" || host.hasSuffix(".claude.ai") else {
+              let host = url.host?.lowercased(), host == "claude.ai" || host.hasSuffix(".claude.ai") else {
             NSSound.beep()
             return
         }
@@ -136,6 +136,7 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
         window.title = "Sign in"
         window.contentView = popup
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.center()
         window.makeKeyAndOrderFront(nil)
         popups.append(window)
@@ -144,7 +145,17 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webViewDidClose(_ webView: WKWebView) {
         popups.filter { $0.contentView === webView }.forEach { $0.close() }
-        popups.removeAll { $0.contentView === webView }
+    }
+
+    /// A pop-up closed by its page or its close button: stop it and let it go.
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, popups.contains(where: { $0 === window }) else { return }
+        (window.contentView as? WKWebView)?.stopLoading()
+        popups.removeAll { $0 === window }
+    }
+
+    private func closePopups() {
+        popups.forEach { $0.close() }
     }
 
     // MARK: Private
@@ -178,10 +189,12 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
                 guard let self, let window = self.signInWindow, window.isVisible else {
                     self?.signInWindow = nil
                     self?.signInView = nil
+                    self?.closePopups()
                     return
                 }
                 if (try? await self.getJSON("/api/organizations")) != nil {
                     window.close()
+                    self.closePopups()
                     self.signInWindow = nil
                     self.signInView = nil
                     self.onSignedIn?()

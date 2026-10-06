@@ -89,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if model.signedIn {
             Task {
                 await session.signOut()
-                model.signedIn = false
+                model.signedOut()
             }
         } else {
             session.showSignIn()

@@ -32,6 +32,18 @@ func advise(_ orgs: [OrgStatus], cc: String? = "pikachu") -> Advice? {
                 == "Claude Code is on Pikachu, the right place right now.")
     }
 
+    // An org that stopped reading keeps its last reading; once its 5-hour window has passed
+    // it looks empty, but that's not a reason to move there.
+    @Test func aStaleOrgIsNeverAdvised() {
+        let busy = status(pikachu, .primary, week: 60, reset: friday4am, session: 85,
+                          sessionReset: designNow.addingTimeInterval(1.5 * 3600))
+        var stale = status(charizard, .overflow, week: 60, reset: monday9am)
+        stale.reading.time = designNow.addingTimeInterval(-20 * 60)
+        #expect(advise([busy, stale]) == nil)
+        stale.reading.time = designNow.addingTimeInterval(-5 * 60)
+        #expect(advise([busy, stale])?.target == charizard)
+    }
+
     // With one org there's nothing to switch between, so no line about switching.
     @Test func oneOrgNeedsNoStatusLine() {
         let one = [status(pikachu, .primary, week: 95, reset: friday4am)]

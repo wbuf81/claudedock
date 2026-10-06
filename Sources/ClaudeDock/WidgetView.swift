@@ -153,6 +153,7 @@ private struct OrgBlock: View {
         let summary = Copy.widgetSummary(org.name, model.reading(for: org), light: model.light(for: org),
                                          forecast: model.forecast(for: org), now: model.now, formatting: model.formatting)
         content
+            .opacity(model.reading(for: org) != nil && !model.isFresh(org) && !model.isStale ? 0.55 : 1)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(summary)
             .accessibilityHint("Opens the details")
@@ -178,8 +179,9 @@ private struct OrgBlock: View {
         }
         let bar = UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
                            color: Palette.accent, height: 6 * k)
-        let caption = reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) }
-            ?? model.orgProblems[org.id]?.short ?? "no reading yet"
+        // An org that stopped reading says why, and dims unless the whole widget already has.
+        let caption = model.orgProblems[org.id]?.short
+            ?? reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) } ?? "no reading yet"
 
         if vertical {
             VStack(spacing: 6 * k) {
