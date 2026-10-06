@@ -61,7 +61,7 @@ private struct OrgBlock: View {
                      color: red ? Palette.crit : Palette.accent)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(org.name).font(.system(size: 11, weight: .semibold))
+                    Text(org.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
                     StoplightDot(light: light)
                 }
                 UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),

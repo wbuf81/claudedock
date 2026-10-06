@@ -64,7 +64,7 @@ private struct OrgSection: View {
         let light = model.light(for: org) ?? .yellow
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Text(org.name).font(.system(size: 13, weight: .bold))
+                Text(org.name).font(.system(size: 13, weight: .bold)).lineLimit(1)
                 StoplightDot(light: light)
                 Text(model.role(of: org) == .primary ? "Desktop app + Claude Code" : "Extra Claude Code")
                     .font(.system(size: 10))

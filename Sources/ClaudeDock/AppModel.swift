@@ -64,7 +64,7 @@ final class AppModel: ObservableObject {
         if !shown.contains(where: { $0.id == settings.primaryOrg }) {
             settings.primaryOrg = shown.first(where: { $0.id == claudeCodeOrg })?.id ?? shown.first?.id
         }
-        orgs = shown.sorted { role(of: $0) == .primary && role(of: $1) != .primary }
+        orgs = DisplayNames.short(shown).sorted { role(of: $0) == .primary && role(of: $1) != .primary }
     }
 
     func ingest(_ readings: [Reading], claudeCodeOrg: String?, at time: Date) {
