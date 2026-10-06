@@ -28,3 +28,5 @@ func reading(
 }
 
 func near(_ a: Double, _ b: Double, _ tolerance: Double = 0.05) -> Bool { abs(a - b) <= tolerance }
+
+let fmt = Formatting(calendar: newYork)
