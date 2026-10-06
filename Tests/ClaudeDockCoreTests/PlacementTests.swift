@@ -41,29 +41,29 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
     let size = CGSize(width: 570, height: 82)
 
     @Test func defaultsToTheCornerBesideTheDock() {
-        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, saved: nil)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: nil)
                 == CGPoint(x: 1978, y: 6))
     }
 
     @Test func sideOrHiddenDockStaysInsideTheVisibleFrame() {
         let rightDock = CGRect(x: 0, y: 0, width: 2470, height: 1440)
-        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: rightDock, saved: nil)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: rightDock, spot: nil)
                 == CGPoint(x: 1888, y: 12))
     }
 
     @Test func savedSpotIsKeptFromTheBottomRight() {
         let saved = WidgetOffset(right: 100, bottom: 400)
-        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, saved: saved)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: .free(saved))
                 == CGPoint(x: 1890, y: 400))
         // A bigger widget grows left and up from the same bottom-right anchor.
         let bigger = CGSize(width: 700, height: 100)
-        #expect(WidgetPlacement.origin(size: bigger, screen: screen, visible: visibleWithDock, saved: saved)
+        #expect(WidgetPlacement.origin(size: bigger, screen: screen, visible: visibleWithDock, spot: .free(saved))
                 == CGPoint(x: 1760, y: 400))
     }
 
     @Test func savedSpotIsPulledBackOnScreen() {
         let offScreen = WidgetOffset(right: -300, bottom: 5000)
-        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, saved: offScreen)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: .free(offScreen))
                 == CGPoint(x: 1990, y: 1358))
     }
 
@@ -71,7 +71,7 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         let origin = CGPoint(x: 1200, y: 300)
         let offset = WidgetPlacement.offset(origin: origin, size: size, screen: screen)
         #expect(offset == WidgetOffset(right: 790, bottom: 300))
-        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, saved: offset) == origin)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: .free(offset)) == origin)
     }
 }
 
@@ -90,9 +90,20 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
                 == CGRect(x: 1198, y: 592, width: 372, height: 700))
     }
 
-    @Test func staysInsideTheScreenEdges() {
-        let widget = CGRect(x: 10, y: 6, width: 300, height: 82)
-        #expect(WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: visibleWithDock).minX == 8)
+    @Test func linesUpLeftEdgesOnTheLeftHalf() {
+        let widget = CGRect(x: 12, y: 6, width: 300, height: 82)
+        #expect(WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: visibleWithDock).minX == 12)
+    }
+
+    @Test func opensBesideAVerticalWidgetOnTheRight() {
+        let strip = CGRect(x: 2450, y: 600, width: 104, height: 300)
+        #expect(WidgetPlacement.panelFrame(panel: panel, widget: strip, visible: visibleWithDock)
+                == CGRect(x: 2070, y: 400, width: 372, height: 700))
+    }
+
+    @Test func opensBesideAVerticalWidgetOnTheLeft() {
+        let strip = CGRect(x: 6, y: 600, width: 104, height: 300)
+        #expect(WidgetPlacement.panelFrame(panel: panel, widget: strip, visible: visibleWithDock).minX == 118)
     }
 
     @Test func shrinksWhenThereIsNotEnoughRoom() {
@@ -103,3 +114,60 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
     }
 }
 
+
+@Suite struct SnapPointTests {
+    let wide = CGSize(width: 481, height: 82)
+    let tall = CGSize(width: 104, height: 300)
+
+    func origin(_ point: SnapPoint, _ size: CGSize) -> CGPoint {
+        WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: .snapped(point))
+    }
+
+    @Test func cornersSitBesideTheDockOrInsideTheScreen() {
+        #expect(origin(.bottomRight, wide) == CGPoint(x: 2067, y: 6))
+        #expect(origin(.bottomLeft, wide) == CGPoint(x: 12, y: 6))
+        #expect(origin(.topRight, wide) == CGPoint(x: 2067, y: 1346))
+        #expect(origin(.topLeft, wide) == CGPoint(x: 12, y: 1346))
+    }
+
+    @Test func edgesCentreTheWidgetVertically() {
+        #expect(origin(.rightMiddle, tall) == CGPoint(x: 2450, y: 615))
+        #expect(origin(.leftMiddle, tall) == CGPoint(x: 6, y: 615))
+    }
+
+    @Test func noSpotMeansBottomRight() {
+        #expect(WidgetPlacement.origin(size: wide, screen: screen, visible: visibleWithDock, spot: nil) == CGPoint(x: 2067, y: 6))
+    }
+
+    @Test func dropsNearASnapPointSnap() {
+        func drop(_ frame: CGRect) -> SnapPoint? { WidgetPlacement.snap(frame: frame, screen: screen, visible: visibleWithDock) }
+        #expect(drop(CGRect(x: 40, y: 30, width: 481, height: 82)) == .bottomLeft)
+        #expect(drop(CGRect(x: 2040, y: 1320, width: 481, height: 82)) == .topRight)
+        #expect(drop(CGRect(x: 2420, y: 700, width: 104, height: 300)) == .rightMiddle)
+        #expect(drop(CGRect(x: 30, y: 500, width: 481, height: 82)) == .leftMiddle)
+        #expect(drop(CGRect(x: 1000, y: 600, width: 481, height: 82)) == nil)
+    }
+
+    @Test func sideEdgesAreVerticalUnlessOverridden() {
+        #expect(WidgetLayout.isVertical(spot: .snapped(.rightMiddle), choice: .automatic))
+        #expect(WidgetLayout.isVertical(spot: .snapped(.leftMiddle), choice: .automatic))
+        #expect(!WidgetLayout.isVertical(spot: .snapped(.bottomLeft), choice: .automatic))
+        #expect(!WidgetLayout.isVertical(spot: .free(WidgetOffset(right: 0, bottom: 0)), choice: .automatic))
+        #expect(!WidgetLayout.isVertical(spot: nil, choice: .automatic))
+        #expect(WidgetLayout.isVertical(spot: .snapped(.bottomRight), choice: .vertical))
+        #expect(!WidgetLayout.isVertical(spot: .snapped(.rightMiddle), choice: .horizontal))
+    }
+
+    @Test func sizesStayBetween60And200Percent() {
+        #expect(WidgetLayout.clampSize(0.3) == 0.6)
+        #expect(WidgetLayout.clampSize(1.25) == 1.25)
+        #expect(WidgetLayout.clampSize(3) == 2)
+    }
+
+    @Test func spotsSurviveSaving() throws {
+        for spot in [WidgetSpot.snapped(.leftMiddle), .free(WidgetOffset(right: 12, bottom: 40))] {
+            let data = try JSONEncoder().encode(spot)
+            #expect(try JSONDecoder().decode(WidgetSpot.self, from: data) == spot)
+        }
+    }
+}

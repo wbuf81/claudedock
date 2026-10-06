@@ -16,12 +16,17 @@ final class DockController {
     private var changes: AnyCancellable?
     private var hiddenUntil: Date?
     private var dragStart: (mouse: NSPoint, origin: NSPoint)?
+    private var pinchFactor: Double = 1
+    private var settingsChanges: AnyCancellable?
 
     init(model: AppModel, actions: WidgetActions) {
         self.model = model
         widget.contentView = NSHostingView(rootView: WidgetView(model: model, actions: actions))
         panel.contentView = NSHostingView(rootView: PanelView(model: model, actions: actions))
         changes = model.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.layout() } }
+        }
+        settingsChanges = model.settings.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.layout() } }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -82,15 +87,42 @@ final class DockController {
         widget.setFrameOrigin(NSPoint(x: start.origin.x + mouse.x - start.mouse.x, y: start.origin.y + mouse.y - start.mouse.y))
     }
 
+    /// Near one of the six snap points the widget snaps there; anywhere else it stays put.
     func dragEnded() {
         dragStart = nil
         guard let screen = NSScreen.screens.first else { return }
-        model.settings.widgetOffset = WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size, screen: screen.frame)
+        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame) {
+            model.settings.widgetSpot = .snapped(point)
+        } else {
+            model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size,
+                                                                     screen: screen.frame))
+        }
         layout()
     }
 
-    func snapBack() {
-        model.settings.widgetOffset = nil
+    func place(_ point: SnapPoint) {
+        model.settings.widgetSpot = .snapped(point)
+        layout()
+    }
+
+    func setLayout(_ choice: LayoutChoice) {
+        model.settings.layoutChoice = choice
+        layout()
+    }
+
+    func setSize(_ scale: Double) {
+        model.settings.sizeScale = WidgetLayout.clampSize(scale)
+        layout()
+    }
+
+    /// Resizes live while pinching, and keeps the size when the pinch ends.
+    func pinch(_ magnification: Double, ended: Bool) {
+        if ended {
+            pinchFactor = 1
+            model.settings.sizeScale = WidgetLayout.clampSize(model.settings.sizeScale * magnification)
+        } else {
+            pinchFactor = WidgetLayout.clampSize(model.settings.sizeScale * magnification) / model.settings.sizeScale
+        }
         layout()
     }
 
@@ -99,19 +131,22 @@ final class DockController {
     /// dragged it, or the bottom-right corner beside the Dock.
     private func layout() {
         guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
+        let settings = model.settings
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
-        let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize)
-        let scale = DockFit.contentScale(tileSize: tileSize)
-        if abs(model.widgetHeight - height) > 0.5 || abs(model.widgetScale - scale) > 0.001 {
+        let ownerScale = settings.sizeScale * pinchFactor
+        let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
+        let scale = DockFit.contentScale(tileSize: tileSize) * ownerScale
+        let vertical = WidgetLayout.isVertical(spot: settings.widgetSpot, choice: settings.layoutChoice)
+        if abs(model.widgetHeight - height) > 0.5 || abs(model.widgetScale - scale) > 0.001 || model.vertical != vertical {
             model.widgetHeight = height  // these changes trigger another layout with the new size
             model.widgetScale = scale
+            model.vertical = vertical
             return
         }
         guard dragStart == nil else { return }
-        let size = content.fittingSize
-        let origin = WidgetPlacement.origin(size: size, screen: screen.frame, visible: screen.visibleFrame,
-                                            saved: model.settings.widgetOffset)
-        let frame = NSRect(origin: origin, size: size)
+        let origin = WidgetPlacement.origin(size: content.fittingSize, screen: screen.frame,
+                                            visible: screen.visibleFrame, spot: settings.widgetSpot)
+        let frame = NSRect(origin: origin, size: content.fittingSize)
         if frame != widget.frame { widget.setFrame(frame, display: true) }
         if panel.isVisible { placePanel() }
     }

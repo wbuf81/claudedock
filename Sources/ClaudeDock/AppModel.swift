@@ -16,6 +16,8 @@ final class AppModel: ObservableObject {
     /// Dock's icon size; the widget itself is `widgetHeight` tall, matching the Dock bar.
     @Published var widgetScale: CGFloat = 1
     @Published var widgetHeight: CGFloat = 60
+    /// Stacked as a narrow strip, for the left and right edges.
+    @Published var vertical = false
 
     let settings: Settings
     let formatting = Formatting()

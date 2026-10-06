@@ -13,8 +13,11 @@ final class Settings: ObservableObject {
     @Published var notifySwitch: Bool { didSet { defaults.set(notifySwitch, forKey: "notifySwitch") } }
     @Published var notifyRed: Bool { didSet { defaults.set(notifyRed, forKey: "notifyRed") } }
     @Published var demoMode: Bool { didSet { defaults.set(demoMode, forKey: "demoMode") } }
-    /// Where the owner dragged the widget; nil means the bottom-right corner.
-    @Published var widgetOffset: WidgetOffset? { didSet { save(widgetOffset, "widgetOffset") } }
+    /// Where the owner put the widget; nil means the bottom-right corner.
+    @Published var widgetSpot: WidgetSpot? { didSet { save(widgetSpot, "widgetSpot") } }
+    @Published var layoutChoice: LayoutChoice { didSet { defaults.set(layoutChoice.rawValue, forKey: "layoutChoice") } }
+    /// A multiple of the Dock-matched size, 0.6...2.
+    @Published var sizeScale: Double { didSet { defaults.set(sizeScale, forKey: "sizeScale") } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -25,7 +28,11 @@ final class Settings: ObservableObject {
         notifySwitch = defaults.object(forKey: "notifySwitch") as? Bool ?? true
         notifyRed = defaults.object(forKey: "notifyRed") as? Bool ?? true
         demoMode = defaults.bool(forKey: "demoMode")
-        widgetOffset = Self.load(WidgetOffset.self, "widgetOffset", defaults)
+        // Earlier versions saved only a dragged-to offset.
+        widgetSpot = Self.load(WidgetSpot.self, "widgetSpot", defaults)
+            ?? Self.load(WidgetOffset.self, "widgetOffset", defaults).map { .free($0) }
+        layoutChoice = LayoutChoice(rawValue: defaults.string(forKey: "layoutChoice") ?? "") ?? .automatic
+        sizeScale = WidgetLayout.clampSize(defaults.object(forKey: "sizeScale") as? Double ?? 1)
     }
 
     /// The owner's picks, or by default every paid org (a free personal org has no billing type).

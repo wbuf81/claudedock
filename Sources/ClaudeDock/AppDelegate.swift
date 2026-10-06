@@ -27,7 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             quit: { NSApp.terminate(nil) },
             dragChanged: { [weak self] in self?.dock.dragChanged() },
             dragEnded: { [weak self] in self?.dock.dragEnded() },
-            snapBack: { [weak self] in self?.dock.snapBack() }))
+            place: { [weak self] in self?.dock.place($0) },
+            layout: { [weak self] in self?.dock.setLayout($0) },
+            size: { [weak self] in self?.dock.setSize($0) },
+            pinch: { [weak self] in self?.dock.pinch($0, ended: $1) }))
 
         dock.onPanelOpened = { [weak self] in
             guard let self, !self.model.settings.demoMode else { return }

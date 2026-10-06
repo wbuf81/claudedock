@@ -148,7 +148,11 @@ struct WidgetActions {
     var quit: () -> Void = {}
     var dragChanged: () -> Void = {}
     var dragEnded: () -> Void = {}
-    var snapBack: () -> Void = {}
+    var place: (SnapPoint) -> Void = { _ in }
+    var layout: (LayoutChoice) -> Void = { _ in }
+    var size: (Double) -> Void = { _ in }
+    /// A trackpad pinch: the magnification so far, and whether the pinch has ended.
+    var pinch: (Double, Bool) -> Void = { _, _ in }
 
     static let none = WidgetActions()
 }
