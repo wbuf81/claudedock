@@ -23,6 +23,9 @@ Any other org on the login (for example a free personal org) is hidden by defaul
 Which org is primary and which is overflow is set in Settings and stored locally. No
 org names, IDs or account details appear in this repository.
 
+Examples in this repository (tests, demo mode, docs) use Pokémon names for orgs:
+**Pikachu** is the primary org and **Charizard** the overflow org.
+
 Each org has a 5-hour session limit, a weekly limit, and sometimes a model-specific
 weekly limit (for example "Fable"). Each org's week resets at its own day and time.
 
@@ -30,9 +33,11 @@ weekly limit (for example "Fable"). Each org's week resets at its own day and ti
 
 ### Corner widget (always visible)
 
-- Borderless, 60 pt tall (Dock height), pinned 12 pt from the bottom-right of the main
-  screen's visible frame. Shows on every Space, including full-screen apps. Never takes
-  keyboard focus. Floats above normal windows.
+- Borderless, 60 pt tall (Dock height), in the bottom-right corner of the main screen.
+  With the Dock at the bottom it sits beside the Dock (6 pt above the screen's bottom
+  edge, 12 pt from the right); otherwise it sits 12 pt inside the visible frame, so a
+  side Dock is never covered. Shows on every Space, including full-screen apps. Never
+  takes keyboard focus. Floats above normal windows.
 - One block per org, primary first:
   - **Week ring**: fill = % of the week's limit used; a white tick = % of the week that
     has elapsed; the used % in the center.
@@ -96,7 +101,9 @@ requests run as `fetch()` inside that page (same origin, cookies included) via
   `{kind: session | weekly_all | weekly_scoped, percent, severity, resets_at,
   scope.model.display_name}`. If `limits` is missing, fall back to
   `five_hour.utilization/resets_at` and `seven_day.utilization/resets_at`. A session with
-  `resets_at: null` means no 5-hour window is open.
+  `resets_at: null` means no 5-hour window is open. A weekly limit with
+  `resets_at: null` means the week hasn't started: nothing used, no forecast, and a
+  steady (not pulsing) green dot.
 - Cadence: every 3 minutes; on panel open when the newest reading is over 30 seconds old;
   immediately on wake from sleep. On errors, back off 3 → 6 → 12 → 15 minutes.
 - A 401 or 403, or a redirect to the login page, means signed out.
@@ -200,7 +207,7 @@ A Swift package, macOS 14 or later, two targets:
 `swift test` covers `ClaudeDockCore`:
 
 - `UsageParser`: a fixture shaped like a real response with IDs replaced by
-  `00000000-0000-4000-8000-00000000000N` and names by `Org A` / `Org B`; the fallback shape
+  `00000000-0000-4000-8000-00000000000N` and names by `Pikachu` / `Charizard`; the fallback shape
   without `limits`; a session with `resets_at: null`; malformed input.
 - `Pace`: worked example U = 55, 103.4 h elapsed, H = 64.6 → about 16.7% a day to use it
   all, about 10.8% unused at the current pace, about 8.7% more by midnight at 11:32 AM.
