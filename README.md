@@ -48,6 +48,20 @@ at the end of the week. Claude Dock answers that at a glance, without opening a 
 It's as tall as your Dock, its rings are the size of your Dock icons, and it uses the same
 clear Liquid Glass, so it looks like part of the Dock.
 
+## Put it anywhere
+
+Drag it near a corner or the middle of either side and it snaps into place; drop it anywhere
+else and it stays put. On the left or right edge it becomes a narrow strip, like a Dock on
+the side, and the panel opens beside it.
+
+<p align="center">
+  <img src="docs/images/vertical.jpg" alt="The widget as a vertical strip on the right edge, with its panel open beside it" width="640">
+</p>
+
+Right-click it for **Position** (any corner or side), **Layout** (automatic, horizontal or
+vertical) and **Size** (Small, Match Dock, Large, Extra large), or pinch on your trackpad
+over it to resize freely.
+
 ## Every state
 
 <p align="center">
@@ -102,8 +116,9 @@ open "build/Claude Dock.app"    # first launch asks you to sign in to claude.ai 
 Then:
 
 - **Click** the widget to open the panel; click anywhere else or press Esc to close it.
-- **Drag** it anywhere; it remembers the spot. Right-click → **Snap back to corner** returns it.
-- **Right-click** for Refresh now, Hide for 1 hour, Settings, Sign out and Quit.
+- **Drag** it anywhere; near a corner or the middle of a side it snaps there, and it remembers the spot.
+- **Pinch** on your trackpad over it to resize it.
+- **Right-click** for Refresh now, Position, Layout, Size, Hide for 1 hour, Settings, Sign out and Quit.
 - **Settings** picks which orgs to show and which one the desktop app shares, sets every
   threshold, toggles notifications, and has a **demo mode** with Pokémon sample data.
 

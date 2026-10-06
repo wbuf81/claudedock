@@ -30,6 +30,9 @@ enum Showcase {
             write(PanelOnly(model: main, dark: scheme == .dark), size: CGSize(width: 520, height: 900), scheme: scheme, to: dir, name)
         }
         write(SocialCard(model: main), size: CGSize(width: 1280, height: 640), scheme: .dark, to: dir, "social-card.png")
+        let side = model(scenarios[0])
+        side.vertical = true
+        write(SideScene(model: side), size: CGSize(width: 1000, height: 820), scheme: .dark, to: dir, "vertical.png")
         try? FileManager.default.removeItem(at: history)
         print("Showcase written to \(dir.path)")
     }
@@ -106,6 +109,23 @@ private struct DesktopScene: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 12)
             .padding(.bottom, 6)
+        }
+    }
+}
+
+/// The right edge of a desktop: the vertical strip with its panel opened beside it.
+private struct SideScene: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Wallpaper(dark: true)
+            HStack(alignment: .center, spacing: 8) {
+                PanelView(model: model, actions: .none).fixedSize()
+                WidgetView(model: model, actions: .none).fixedSize()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+            .padding(.trailing, 6)
         }
     }
 }
