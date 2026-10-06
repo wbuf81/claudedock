@@ -161,8 +161,9 @@ private struct BarRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            // At least 44 pt so the bars line up; a long model name widens it rather than wrapping.
             Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
-                .lineLimit(1).minimumScaleFactor(0.7).frame(width: 44, alignment: .leading)
+                .lineLimit(1).fixedSize().frame(minWidth: 44, alignment: .leading)
             UsageBar(used: used, tick: tick, color: Palette.accent)
             Text(detail).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).frame(width: 128, alignment: .trailing)
         }
