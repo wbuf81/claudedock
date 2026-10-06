@@ -114,6 +114,8 @@ private struct OrgSection: View {
                                                forecast: forecast, history: model.history),
                     red: light == .red,
                     resetLabel: reading.weekResetsAt.map { model.formatting.dayTime($0, now: model.now) })
+                .accessibilityElement()
+                .accessibilityLabel("Week chart: \(Copy.weekLine(reading, forecast: forecast, now: model.now, formatting: model.formatting))")
                 if showLegend { ChartLegend() }
                 TodayBox(today: Copy.today(reading, forecast: forecast, now: model.now,
                                            formatting: model.formatting, model.settings.thresholds))
@@ -159,7 +161,8 @@ private struct BarRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
+            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+                .lineLimit(1).minimumScaleFactor(0.7).frame(width: 44, alignment: .leading)
             UsageBar(used: used, tick: tick, color: Palette.accent)
             Text(detail).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).frame(width: 128, alignment: .trailing)
         }

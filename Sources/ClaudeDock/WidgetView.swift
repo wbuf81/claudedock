@@ -38,7 +38,7 @@ struct WidgetView: View {
             if model.orgs.isEmpty { placeholder.padding(.horizontal, 16 * k) }
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
                 if index > 0 { Divider().padding(.vertical, 16 * k) }
-                OrgBlock(model: model, org: org, k: k, vertical: false)
+                OrgBlock(model: model, org: org, k: k, vertical: false, open: actions.tap)
             }
         }
         .frame(height: model.widgetHeight)
@@ -56,7 +56,7 @@ struct WidgetView: View {
             if model.orgs.isEmpty { placeholder.padding(.vertical, 16 * k) }
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
                 if index > 0 { Divider().padding(.horizontal, 24 * k) }
-                OrgBlock(model: model, org: org, k: k, vertical: true)
+                OrgBlock(model: model, org: org, k: k, vertical: true, open: actions.tap)
             }
         }
         .frame(width: 104 * k)
@@ -64,7 +64,8 @@ struct WidgetView: View {
     }
 
     private func switchTab(_ advice: Advice) -> some View {
-        VStack(spacing: 1 * k) {
+        let summary = "Move Claude Code to \(advice.target.name): \(advice.reason)."
+        return VStack(spacing: 1 * k) {
             Text("⇄").font(.system(size: 14 * k)).foregroundStyle(Palette.warn)
             Text("\(advice.target.name)\nfirst")
                 .font(.system(size: max(9.5 * k, 9), weight: .semibold))
@@ -73,6 +74,9 @@ struct WidgetView: View {
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: 64 * k)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary)
+        .help(summary)
     }
 
     private var placeholder: some View {
@@ -143,8 +147,22 @@ private struct OrgBlock: View {
     let org: Org
     let k: CGFloat
     let vertical: Bool
+    let open: () -> Void
 
     var body: some View {
+        let summary = Copy.widgetSummary(org.name, model.reading(for: org), light: model.light(for: org),
+                                         forecast: model.forecast(for: org), now: model.now, formatting: model.formatting)
+        content
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(summary)
+            .accessibilityHint("Opens the details")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, open)
+            .help(summary)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         let reading = model.reading(for: org)
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow

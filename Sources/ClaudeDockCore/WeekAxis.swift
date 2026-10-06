@@ -15,7 +15,7 @@ public struct WeekAxis: Equatable, Sendable {
     public let end: Date
     public let calendar: Calendar
 
-    public init(containing date: Date, calendar: Calendar = .current) {
+    public init(containing date: Date, calendar: Calendar = .autoupdatingCurrent) {
         var monday = calendar
         monday.firstWeekday = 2
         let week = monday.dateInterval(of: .weekOfYear, for: date)!

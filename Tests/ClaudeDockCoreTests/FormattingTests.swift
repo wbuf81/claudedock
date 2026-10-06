@@ -14,6 +14,19 @@ import Testing
         #expect(fmt.dayTime(local(2026, 10, 7, 21, 30), now: designNow) == "Wed 9:30 PM")
     }
 
+    @Test func twentyFourHourClock() {
+        let f = Formatting(calendar: newYork, twentyFourHour: true)
+        #expect(f.dayTime(local(2026, 10, 6, 16, 20), now: designNow) == "16:20")
+        #expect(f.dayTime(local(2026, 10, 6, 16, 0), now: designNow) == "16:00")
+        #expect(f.dayTime(local(2026, 10, 9, 4, 0), now: designNow) == "Fri 04:00")
+    }
+
+    @Test func theLocaleChoosesTheClock() {
+        #expect(Formatting.prefers24Hour(Locale(identifier: "en_US")) == false)
+        #expect(Formatting.prefers24Hour(Locale(identifier: "en_GB")) == true)
+        #expect(Formatting.prefers24Hour(Locale(identifier: "de_DE")) == true)
+    }
+
     @Test func compactDurations() {
         #expect(Formatting.compact(34 * 3600 + 20 * 60) == "1d 10h")
         #expect(Formatting.compact(3 * 3600 + 5 * 60) == "3h 5m")

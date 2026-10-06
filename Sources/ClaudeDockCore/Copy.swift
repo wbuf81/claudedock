@@ -14,6 +14,23 @@ public enum Copy {
         return "5h \(Formatting.percent(r.session)) · \(week)"
     }
 
+    /// One org in the widget as a sentence, for VoiceOver and the tooltip.
+    public static func widgetSummary(_ name: String, _ r: Reading?, light: Light?, forecast: WeekForecast?,
+                                     now: Date, formatting: Formatting) -> String {
+        guard let r else { return "\(name): no reading yet." }
+        var parts = ["\(Formatting.percent(r.week)) of the week used"]
+        if let forecast { parts.append("\(Formatting.percent(forecast.elapsedFraction * 100)) of the week gone") }
+        let state: String? = switch light {
+        case .green?: "Use it: at this pace some would go unused."
+        case .yellow?: "On pace."
+        case .red?: "Nearly out."
+        case nil: nil
+        }
+        let reset = r.weekResetsAt.map { "Week resets \(formatting.dayTime($0, now: now))." } ?? "The week hasn't started."
+        return ["\(name): \(parts.joined(separator: ", ")).", state, "5-hour window \(Formatting.percent(r.session)) used.", reset]
+            .compactMap { $0 }.joined(separator: " ")
+    }
+
     /// "62% of the week gone · resets Fri 4 AM"
     public static func weekLine(_ r: Reading, forecast: WeekForecast?, now: Date, formatting: Formatting) -> String {
         guard let forecast, let reset = r.weekResetsAt else { return "this week hasn't started" }

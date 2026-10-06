@@ -35,12 +35,19 @@ final class AppModel: ObservableObject {
     private var gate = AdviceGate()
     private var primaryOverride: String?
     private static let keep: TimeInterval = 35 * 24 * 3600
+    /// The pace looks back 3 days and the chart shows one week, so only the last 8 days are
+    /// kept in memory (and filtered on every redraw); the file keeps all 35.
+    private static let inMemory: TimeInterval = 8 * 24 * 3600
 
     init(settings: Settings, store: HistoryStore) {
         self.settings = settings
         self.store = store
         try? store.prune(olderThan: Date().addingTimeInterval(-Self.keep))
-        history = store.load()
+        history = Self.recent(store.load(), now: Date())
+    }
+
+    private static func recent(_ readings: [Reading], now: Date) -> [Reading] {
+        readings.filter { now.timeIntervalSince($0.time) < inMemory }
     }
 
     var lastUpdated: Date? { latest.values.map(\.time).max() }
@@ -87,7 +94,7 @@ final class AppModel: ObservableObject {
         now = time
         self.claudeCodeOrg = claudeCodeOrg
         for r in outcome.readings { latest[r.org] = r }
-        history.append(contentsOf: outcome.readings)
+        history = Self.recent(history + outcome.readings, now: time)
         try? store.append(outcome.readings)
         signedIn = true
         problem = Copy.problem(outcome.failures, shown: orgs.count)
@@ -147,7 +154,7 @@ final class AppModel: ObservableObject {
         orgs = []
         latest = [:]
         advice = nil
-        history = store.load()
+        history = Self.recent(store.load(), now: Date())
         now = Date()
     }
 }

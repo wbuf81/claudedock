@@ -28,7 +28,7 @@ public enum Pace {
 
     /// nil when the week hasn't started or has already reset.
     public static func forecast(_ reading: Reading, history: [Reading], now: Date,
-                                calendar: Calendar = .current) -> WeekForecast? {
+                                calendar: Calendar = .autoupdatingCurrent) -> WeekForecast? {
         guard let reset = reading.weekResetsAt, reset > now else { return nil }
         let used = reading.week
         let left = 100 - used
