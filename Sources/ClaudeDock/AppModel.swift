@@ -10,7 +10,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var claudeCodeOrg: String?
     @Published private(set) var advice: Advice?
     @Published var signedIn = true
-    @Published var lastError: String?
+    /// What went wrong on the last refresh, for the panel; nil when it all worked.
+    @Published private(set) var problem: String?
+    /// Why an org has no reading, for the widget's caption.
+    @Published private(set) var orgProblems: [String: RefreshProblem] = [:]
+    /// Why nothing could be read at all, for the widget's placeholder.
+    @Published private(set) var refreshProblem: RefreshProblem?
     @Published var now = Date()
     /// The widget's contents are drawn for a 60 pt height and scaled by this to match the
     /// Dock's icon size; the widget itself is `widgetHeight` tall, matching the Dock bar.
@@ -23,6 +28,8 @@ final class AppModel: ObservableObject {
     let formatting = Formatting()
     var onAdvice: ((Advice) -> Void)?
     var onRed: ((Org) -> Void)?
+    /// claude.ai ended the session on its own (not a sign-out from the menu).
+    var onSignedOut: (() -> Void)?
 
     private let store: HistoryStore
     private var gate = AdviceGate()
@@ -73,17 +80,33 @@ final class AppModel: ObservableObject {
         orgs = DisplayNames.short(shown).sorted { role(of: $0) == .primary && role(of: $1) != .primary }
     }
 
-    func ingest(_ readings: [Reading], claudeCodeOrg: String?, at time: Date) {
+    /// A refresh round: keeps every reading it got, and says which orgs it couldn't read.
+    func ingest(_ outcome: UsageRound.Outcome, claudeCodeOrg: String?, at time: Date) {
         let wasRed = currentOrgIsRed
         now = time
         self.claudeCodeOrg = claudeCodeOrg
-        for r in readings { latest[r.org] = r }
-        history.append(contentsOf: readings)
-        try? store.append(readings)
+        for r in outcome.readings { latest[r.org] = r }
+        history.append(contentsOf: outcome.readings)
+        try? store.append(outcome.readings)
         signedIn = true
-        lastError = nil
+        problem = Copy.problem(outcome.failures, shown: orgs.count)
+        orgProblems = Dictionary(outcome.failures.map { ($0.org.id, $0.problem) }, uniquingKeysWith: { a, _ in a })
+        refreshProblem = outcome.readings.isEmpty ? outcome.failures.first?.problem : nil
         updateAdvice()
         if !wasRed, currentOrgIsRed, let org = orgs.first(where: { $0.id == claudeCodeOrg }) { onRed?(org) }
+    }
+
+    /// Nothing could be read this time (not even the org list).
+    func refreshFailed(_ problem: RefreshProblem) {
+        self.problem = Copy.problem(problem)
+        refreshProblem = problem
+    }
+
+    /// claude.ai says the session is over.
+    func sessionEnded() {
+        guard signedIn else { return }
+        signedIn = false
+        onSignedOut?()
     }
 
     func setClaudeCodeOrg(_ id: String?) {

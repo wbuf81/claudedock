@@ -17,6 +17,7 @@ struct PanelView: View {
             .foregroundStyle(.secondary)
             .padding(.bottom, 8)
 
+            if let problem = model.problem { problemLine(problem) }
             if !model.statusLine.isEmpty { statusLine }
 
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
@@ -34,9 +35,24 @@ struct PanelView: View {
     }
 
     private var updatedText: String {
-        guard let last = model.lastUpdated else { return model.signedIn ? "loading…" : "signed out" }
+        guard let last = model.lastUpdated else {
+            return !model.signedIn ? "signed out" : model.refreshProblem == nil ? "loading…" : "not updated"
+        }
         let time = model.formatting.dayTime(last, now: model.now)
         return model.isStale ? "as of \(time)" : "\(time) · live"
+    }
+
+    private func problemLine(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 7) {
+            Text("⚠︎").foregroundStyle(Palette.warn)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 11.5))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.warn.opacity(0.16), in: RoundedRectangle(cornerRadius: 9))
+        .padding(.bottom, 6)
     }
 
     private var statusLine: some View {

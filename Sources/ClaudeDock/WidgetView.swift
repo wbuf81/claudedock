@@ -73,9 +73,17 @@ struct WidgetView: View {
     }
 
     private var placeholder: some View {
-        Text(model.signedIn ? "Loading usage…" : "Sign in to claude.ai")
+        Text(placeholderText)
             .font(.system(size: 11 * k, weight: .semibold))
             .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .frame(maxWidth: 160 * k)
+    }
+
+    private var placeholderText: String {
+        if !model.signedIn { return "Sign in to claude.ai" }
+        if let problem = model.refreshProblem { return "Can't read usage:\n\(problem.short)" }
+        return "Loading usage…"
     }
 
     @ViewBuilder
@@ -149,7 +157,8 @@ private struct OrgBlock: View {
         }
         let bar = UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
                            color: Palette.accent, height: 6 * k)
-        let caption = reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) } ?? "no reading yet"
+        let caption = reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) }
+            ?? model.orgProblems[org.id]?.short ?? "no reading yet"
 
         if vertical {
             VStack(spacing: 6 * k) {

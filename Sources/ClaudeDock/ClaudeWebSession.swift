@@ -2,18 +2,6 @@ import AppKit
 import WebKit
 import ClaudeDockCore
 
-enum WebSessionError: Error {
-    case signedOut
-    /// A JSON 403: the session may be gone, or only one org's access.
-    case forbidden
-    /// The site's bot check answered instead of the API.
-    case blocked
-    /// The hidden page didn't load.
-    case notReady
-    case badResult
-    case http(Int)
-}
-
 /// The app's own claude.ai session, kept in the app's website data store (separate from
 /// Safari, Chrome and the Claude desktop app). Requests run as fetch() inside a hidden
 /// claude.ai page, so they carry the session cookie and look like the site's own requests.
@@ -63,9 +51,12 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate {
         case .forbidden:
             throw WebSessionError.forbidden
         case .blocked:
-            useFullPage = true
             page.invalidate()
-            throw WebSessionError.blocked
+            // The full usage page can pass the bot check; switch to it and ask again now,
+            // rather than leaving the widget empty until the next refresh.
+            guard !useFullPage else { throw WebSessionError.blocked }
+            useFullPage = true
+            return try await getJSON(path)
         case .failed(let code):
             throw WebSessionError.http(code)
         }

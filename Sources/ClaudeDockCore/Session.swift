@@ -1,5 +1,18 @@
 import Foundation
 
+/// What can go wrong asking claude.ai for something.
+public enum WebSessionError: Error, Equatable, Sendable {
+    case signedOut
+    /// A JSON 403: the session may be gone, or only one org's access.
+    case forbidden
+    /// The site's bot check answered instead of the API.
+    case blocked
+    /// The hidden page didn't load.
+    case notReady
+    case badResult
+    case http(Int)
+}
+
 /// How the app should treat a claude.ai response.
 public enum SessionResponse: Equatable, Sendable {
     case ok
