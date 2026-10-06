@@ -12,17 +12,29 @@ final class DockController {
     // No window shadow: the Dock has none, and on glass it reads as a dark outline.
     private let widget = FloatingPanel(allowsKey: false, shadow: false)
     private let panel = FloatingPanel(allowsKey: true)
+    private let panelContent: NSHostingView<PanelView>
     private var monitors: [Any] = []
     private var changes: AnyCancellable?
     private var hiddenUntil: Date?
     private var dragStart: (mouse: NSPoint, origin: NSPoint)?
     private var pinchFactor: Double = 1
+    /// The owner scale the widget is drawn at now, after fitting it on screen.
+    private var appliedScale: Double = 1
     private var settingsChanges: AnyCancellable?
 
     init(model: AppModel, actions: WidgetActions) {
         self.model = model
         widget.contentView = NSHostingView(rootView: WidgetView(model: model, actions: actions))
-        panel.contentView = NSHostingView(rootView: PanelView(model: model, actions: actions))
+        // The panel scrolls when the screen is too short for it (a 13-inch laptop, three orgs).
+        panelContent = NSHostingView(rootView: PanelView(model: model, actions: actions))
+        let scroll = NSScrollView()
+        scroll.documentView = panelContent
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.contentView.drawsBackground = false
+        scroll.borderType = .noBorder
+        panel.contentView = scroll
         changes = model.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.layout() } }
         }
@@ -32,6 +44,12 @@ final class DockController {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.layout() }
+        }
+        // Apps that open or quit change the Dock's width.
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.layout() }
+            }
         }
     }
 
@@ -56,6 +74,7 @@ final class DockController {
     func openPanel() {
         guard !panel.isVisible else { return }
         placePanel()
+        panelContent.scroll(.zero)
         panel.orderFrontRegardless()
         panel.makeKey()
         onPanelOpened?()
@@ -91,7 +110,8 @@ final class DockController {
     func dragEnded() {
         dragStart = nil
         guard let screen = NSScreen.screens.first else { return }
-        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame) {
+        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame,
+                                            dockWidth: Self.dockWidth(on: screen)) {
             model.settings.widgetSpot = .snapped(point)
         } else {
             model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size,
@@ -133,7 +153,12 @@ final class DockController {
         guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
         let settings = model.settings
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
-        let ownerScale = settings.sizeScale * pinchFactor
+        // The owner's size, shrunk only if the widget wouldn't fit on screen (size measured
+        // from what's drawn now, divided back to scale 1).
+        let current = content.fittingSize
+        let natural = CGSize(width: current.width / appliedScale, height: current.height / appliedScale)
+        let ownerScale = WidgetLayout.fittedScale(settings.sizeScale * pinchFactor, natural: natural,
+                                                  visible: screen.visibleFrame)
         let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
         let scale = DockFit.contentScale(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
         let vertical = WidgetLayout.isVertical(spot: settings.widgetSpot, choice: settings.layoutChoice)
@@ -141,19 +166,39 @@ final class DockController {
             model.widgetHeight = height  // these changes trigger another layout with the new size
             model.widgetScale = scale
             model.vertical = vertical
+            appliedScale = ownerScale
             return
         }
         guard dragStart == nil else { return }
-        let origin = WidgetPlacement.origin(size: content.fittingSize, screen: screen.frame,
-                                            visible: screen.visibleFrame, spot: settings.widgetSpot)
+        let origin = WidgetPlacement.origin(size: content.fittingSize, screen: screen.frame, visible: screen.visibleFrame,
+                                            spot: settings.widgetSpot, dockWidth: Self.dockWidth(on: screen))
         let frame = NSRect(origin: origin, size: content.fittingSize)
         if frame != widget.frame { widget.setFrame(frame, display: true) }
         if panel.isVisible { placePanel() }
     }
 
+    /// The Dock's estimated width, from its settings and the apps running now.
+    private static func dockWidth(on screen: NSScreen) -> Double? {
+        let dock = UserDefaults(suiteName: "com.apple.dock")
+        // Spacers and web apps have no bundle id but still take a slot.
+        func apps(_ key: String) -> [String] {
+            (dock?.array(forKey: key) as? [[String: Any]] ?? []).enumerated().map { index, tile in
+                (tile["tile-data"] as? [String: Any])?["bundle-identifier"] as? String ?? "\(key)-\(index)"
+            }
+        }
+        let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.compactMap(\.bundleIdentifier)
+        let contents = DockFit.contents(pinned: apps("persistent-apps"), recent: apps("recent-apps"), running: running,
+                                        folders: dock?.array(forKey: "persistent-others")?.count ?? 0,
+                                        showRecents: dock?.object(forKey: "show-recents") as? Bool ?? true)
+        return DockFit.estimatedWidth(items: contents.items, dividers: contents.dividers,
+                                      screen: screen.frame, visible: screen.visibleFrame)
+    }
+
     private func placePanel() {
-        guard let content = panel.contentView, let screen = widget.screen ?? NSScreen.screens.first else { return }
-        panel.setFrame(WidgetPlacement.panelFrame(panel: content.fittingSize, widget: widget.frame,
-                                                  visible: screen.visibleFrame), display: true)
+        guard let screen = widget.screen ?? NSScreen.screens.first else { return }
+        let size = panelContent.fittingSize
+        if panelContent.frame.size != size { panelContent.frame = NSRect(origin: .zero, size: size) }
+        panel.setFrame(WidgetPlacement.panelFrame(panel: size, widget: widget.frame, visible: screen.visibleFrame),
+                       display: true)
     }
 }

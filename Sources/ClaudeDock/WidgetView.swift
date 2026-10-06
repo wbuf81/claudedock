@@ -38,7 +38,7 @@ struct WidgetView: View {
             if model.orgs.isEmpty { placeholder.padding(.horizontal, 16 * k) }
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
                 if index > 0 { Divider().padding(.vertical, 16 * k) }
-                OrgBlock(model: model, org: org, k: k, vertical: false)
+                OrgBlock(model: model, org: org, k: k, vertical: false, open: actions.tap)
             }
         }
         .frame(height: model.widgetHeight)
@@ -56,7 +56,7 @@ struct WidgetView: View {
             if model.orgs.isEmpty { placeholder.padding(.vertical, 16 * k) }
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
                 if index > 0 { Divider().padding(.horizontal, 24 * k) }
-                OrgBlock(model: model, org: org, k: k, vertical: true)
+                OrgBlock(model: model, org: org, k: k, vertical: true, open: actions.tap)
             }
         }
         .frame(width: 104 * k)
@@ -64,18 +64,33 @@ struct WidgetView: View {
     }
 
     private func switchTab(_ advice: Advice) -> some View {
-        VStack(spacing: 1 * k) {
+        let summary = "Move Claude Code to \(advice.target.name): \(advice.reason)."
+        return VStack(spacing: 1 * k) {
             Text("⇄").font(.system(size: 14 * k)).foregroundStyle(Palette.warn)
             Text("\(advice.target.name)\nfirst")
-                .font(.system(size: 9.5 * k, weight: .semibold))
+                .font(.system(size: max(9.5 * k, 9), weight: .semibold))
                 .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: 64 * k)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary)
+        .help(summary)
     }
 
     private var placeholder: some View {
-        Text(model.signedIn ? "Loading usage…" : "Sign in to claude.ai")
+        Text(placeholderText)
             .font(.system(size: 11 * k, weight: .semibold))
             .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .frame(maxWidth: 160 * k)
+    }
+
+    private var placeholderText: String {
+        if !model.signedIn { return "Sign in to claude.ai" }
+        if let problem = model.refreshProblem { return "Can't read usage:\n\(problem.short)" }
+        return "Loading usage…"
     }
 
     @ViewBuilder
@@ -132,20 +147,41 @@ private struct OrgBlock: View {
     let org: Org
     let k: CGFloat
     let vertical: Bool
+    let open: () -> Void
 
     var body: some View {
+        let summary = Copy.widgetSummary(org.name, model.reading(for: org), light: model.light(for: org),
+                                         forecast: model.forecast(for: org), now: model.now, formatting: model.formatting)
+        content
+            .opacity(model.reading(for: org) != nil && !model.isFresh(org) && !model.isStale ? 0.55 : 1)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(summary)
+            .accessibilityHint("Opens the details")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, open)
+            .help(summary)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         let reading = model.reading(for: org)
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow
         let ring = WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
                             color: light == .red ? Palette.crit : Palette.accent, size: 48 * k)
         let name = HStack(spacing: 6 * k) {
-            Text(org.name).font(.system(size: 13 * k, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+            Text(org.name)
+                .font(.system(size: max(13 * k, 11), weight: .semibold))
+                .lineLimit(vertical ? 2 : 1)
+                .multilineTextAlignment(vertical ? .center : .leading)
+                .minimumScaleFactor(0.75)
             StoplightDot(light: light, size: 9 * k)
         }
         let bar = UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
                            color: Palette.accent, height: 6 * k)
-        let caption = reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) } ?? "no reading yet"
+        // An org that stopped reading says why, and dims unless the whole widget already has.
+        let caption = model.orgProblems[org.id]?.short
+            ?? reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) } ?? "no reading yet"
 
         if vertical {
             VStack(spacing: 6 * k) {
@@ -153,7 +189,7 @@ private struct OrgBlock: View {
                 name
                 bar.frame(width: 72 * k)
                 Text(caption.replacingOccurrences(of: " · ", with: "\n"))
-                    .font(.system(size: 11 * k, weight: .medium))
+                    .font(.system(size: max(11 * k, 10), weight: .medium))
                     .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .lineSpacing(1 * k)
@@ -167,7 +203,7 @@ private struct OrgBlock: View {
                     name
                     bar
                     Text(caption)
-                        .font(.system(size: 11 * k, weight: .medium))
+                        .font(.system(size: max(11 * k, 10), weight: .medium))
                         .foregroundStyle(Color.primary.opacity(0.75))
                         .lineLimit(1)
                 }

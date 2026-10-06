@@ -17,6 +17,7 @@ struct PanelView: View {
             .foregroundStyle(.secondary)
             .padding(.bottom, 8)
 
+            if let problem = model.problem { problemLine(problem) }
             if !model.statusLine.isEmpty { statusLine }
 
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
@@ -34,9 +35,24 @@ struct PanelView: View {
     }
 
     private var updatedText: String {
-        guard let last = model.lastUpdated else { return model.signedIn ? "loading…" : "signed out" }
+        guard let last = model.lastUpdated else {
+            return !model.signedIn ? "signed out" : model.refreshProblem == nil ? "loading…" : "not updated"
+        }
         let time = model.formatting.dayTime(last, now: model.now)
         return model.isStale ? "as of \(time)" : "\(time) · live"
+    }
+
+    private func problemLine(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 7) {
+            Text("⚠︎").foregroundStyle(Palette.warn)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 11.5))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.warn.opacity(0.16), in: RoundedRectangle(cornerRadius: 9))
+        .padding(.bottom, 6)
     }
 
     private var statusLine: some View {
@@ -66,13 +82,16 @@ private struct OrgSection: View {
             HStack(spacing: 6) {
                 Text(org.name).font(.system(size: 13, weight: .bold)).lineLimit(1)
                 StoplightDot(light: light)
-                Text(model.role(of: org) == .primary ? "Desktop app + Claude Code" : "Extra Claude Code")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
-                    .fixedSize()
+                // Roles only mean something with two orgs to split work between.
+                if model.orgs.count > 1 {
+                    Text(model.role(of: org) == .primary ? "Desktop app + Claude Code" : "Extra Claude Code")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                        .fixedSize()
+                }
                 Spacer(minLength: 4)
                 if model.claudeCodeOrg == org.id {
                     HStack(spacing: 4) {
@@ -95,6 +114,8 @@ private struct OrgSection: View {
                                                forecast: forecast, history: model.history),
                     red: light == .red,
                     resetLabel: reading.weekResetsAt.map { model.formatting.dayTime($0, now: model.now) })
+                .accessibilityElement()
+                .accessibilityLabel("Week chart: \(Copy.weekLine(reading, forecast: forecast, now: model.now, formatting: model.formatting))")
                 if showLegend { ChartLegend() }
                 TodayBox(today: Copy.today(reading, forecast: forecast, now: model.now,
                                            formatting: model.formatting, model.settings.thresholds))
@@ -140,7 +161,9 @@ private struct BarRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
+            // At least 44 pt so the bars line up; a long model name widens it rather than wrapping.
+            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+                .lineLimit(1).fixedSize().frame(minWidth: 44, alignment: .leading)
             UsageBar(used: used, tick: tick, color: Palette.accent)
             Text(detail).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).frame(width: 128, alignment: .trailing)
         }

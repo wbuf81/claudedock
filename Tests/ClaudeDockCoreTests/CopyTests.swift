@@ -50,6 +50,16 @@ import Testing
     }
 
     // Every org's caption has the same shape: the 5-hour window, then when the week resets.
+    // VoiceOver reads each org in the widget as one sentence; the tooltip shows the same.
+    @Test func widgetSummaryReadsTheWholeOrg() {
+        #expect(Copy.widgetSummary("Pikachu", primary, light: light(primary), forecast: forecast(primary), now: designNow, formatting: fmt)
+                == "Pikachu: 55% of the week used, 62% of the week gone. Use it: at this pace some would go unused. 5-hour window 1% used. Week resets Fri 4 AM.")
+        #expect(Copy.widgetSummary("Charizard", overflow, light: light(overflow), forecast: forecast(overflow), now: designNow, formatting: fmt)
+                == "Charizard: 95% of the week used, 80% of the week gone. Nearly out. 5-hour window 0% used. Week resets Wed 9 PM.")
+        #expect(Copy.widgetSummary("Pikachu", nil, light: nil, forecast: nil, now: designNow, formatting: fmt)
+                == "Pikachu: no reading yet.")
+    }
+
     @Test func widgetSublinesShareOneShape() {
         #expect(Copy.widgetSubline(primary, now: designNow, formatting: fmt) == "5h 1% · ↺ Fri 4 AM")
         #expect(Copy.widgetSubline(overflow, now: designNow, formatting: fmt) == "5h 0% · ↺ Wed 9 PM")

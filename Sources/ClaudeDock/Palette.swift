@@ -44,10 +44,13 @@ extension EnvironmentValues {
 }
 
 /// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
-/// clear Liquid Glass, tuned to match the Dock. Otherwise a frosted material.
+/// clear Liquid Glass, tuned to match the Dock. Otherwise, or with Reduce Transparency or
+/// Increase Contrast on, a frosted material.
 struct HUDBackground: ViewModifier {
     @Environment(\.renderStyle) private var style
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
     var radius: CGFloat
     var glass: Bool
 
@@ -64,19 +67,38 @@ struct HUDBackground: ViewModifier {
                 .background(shape.fill(scheme == .dark ? Color(white: 0.11) : Color(white: 0.97)))
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
                 .clipShape(shape)
-        } else if glass, #available(macOS 26.0, *) {
-            // Clear Liquid Glass at 75% with a soft light rim: side by side with the Dock this
-            // let the wallpaper through about as much and kept the same defined edge (full
-            // strength read milkier; 40-60% lost the edge).
-            content.clipShape(shape)
+        } else if glass, !reduceTransparency, contrast == .standard {
+            content.dockGlass(shape)
+        } else {
+            content.frosted(shape)
+        }
+    }
+}
+
+private extension View {
+    /// Clear Liquid Glass at 75% with a soft light rim: side by side with the Dock this let
+    /// the wallpaper through about as much and kept the same defined edge (full strength
+    /// read milkier; 40-60% lost the edge). Needs the macOS 26 SDK to build and macOS 26 to
+    /// run; anything older gets the frosted card.
+    @ViewBuilder
+    func dockGlass(_ shape: RoundedRectangle) -> some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            clipShape(shape)
                 .background { Color.clear.glassEffect(.clear, in: shape).opacity(0.75) }
                 .overlay(shape.strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
         } else {
-            content
-                .background(shape.fill(.regularMaterial))
-                .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
-                .clipShape(shape)
+            frosted(shape)
         }
+        #else
+        frosted(shape)
+        #endif
+    }
+
+    func frosted(_ shape: RoundedRectangle) -> some View {
+        background(shape.fill(.regularMaterial))
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
+            .clipShape(shape)
     }
 }
 

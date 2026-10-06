@@ -10,7 +10,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var claudeCodeOrg: String?
     @Published private(set) var advice: Advice?
     @Published var signedIn = true
-    @Published var lastError: String?
+    /// What went wrong on the last refresh, for the panel; nil when it all worked.
+    @Published private(set) var problem: String?
+    /// Why an org has no reading, for the widget's caption.
+    @Published private(set) var orgProblems: [String: RefreshProblem] = [:]
+    /// Why nothing could be read at all, for the widget's placeholder.
+    @Published private(set) var refreshProblem: RefreshProblem?
     @Published var now = Date()
     /// The widget's contents are drawn for a 60 pt height and scaled by this to match the
     /// Dock's icon size; the widget itself is `widgetHeight` tall, matching the Dock bar.
@@ -23,17 +28,29 @@ final class AppModel: ObservableObject {
     let formatting = Formatting()
     var onAdvice: ((Advice) -> Void)?
     var onRed: ((Org) -> Void)?
+    /// claude.ai ended the session on its own (not a sign-out from the menu).
+    var onSignedOut: (() -> Void)?
 
     private let store: HistoryStore
     private var gate = AdviceGate()
     private var primaryOverride: String?
+    private var session = SessionWatch()
+    /// Demo data is on screen: real account details must stay out of it.
+    private var showingDemo: Bool { primaryOverride != nil }
     private static let keep: TimeInterval = 35 * 24 * 3600
+    /// The pace looks back 3 days and the chart shows one week, so only the last 8 days are
+    /// kept in memory (and filtered on every redraw); the file keeps all 35.
+    private static let inMemory: TimeInterval = 8 * 24 * 3600
 
     init(settings: Settings, store: HistoryStore) {
         self.settings = settings
         self.store = store
         try? store.prune(olderThan: Date().addingTimeInterval(-Self.keep))
-        history = store.load()
+        history = Self.recent(store.load(), now: Date())
+    }
+
+    private static func recent(_ readings: [Reading], now: Date) -> [Reading] {
+        readings.filter { now.timeIntervalSince($0.time) < inMemory }
     }
 
     var lastUpdated: Date? { latest.values.map(\.time).max() }
@@ -59,35 +76,71 @@ final class AppModel: ObservableObject {
 
     var statusLine: String {
         SwitchAdvisor.statusLine(statuses, claudeCodeOrg: claudeCodeOrg, advice: advice, now: now,
-                                 formatting: formatting, settings.thresholds)
+                                 formatting: formatting, settings.thresholds,
+                                 hidden: showingDemo ? [] : settings.knownOrgs.filter { org in !orgs.contains { $0.id == org.id } })
     }
 
     /// The org list from claude.ai: show the selected orgs, primary first. The first time,
     /// the org Claude Code is signed into becomes the primary org.
     func setAvailableOrgs(_ all: [Org], claudeCodeOrg: String?) {
         settings.knownOrgs = all
-        let shown = all.filter { settings.isShown($0) }
+        let shown = OrgFilter.shown(all, choices: settings.orgChoices)
         if !shown.contains(where: { $0.id == settings.primaryOrg }) {
             settings.primaryOrg = shown.first(where: { $0.id == claudeCodeOrg })?.id ?? shown.first?.id
         }
+        guard !showingDemo else { return }
         orgs = DisplayNames.short(shown).sorted { role(of: $0) == .primary && role(of: $1) != .primary }
     }
 
-    func ingest(_ readings: [Reading], claudeCodeOrg: String?, at time: Date) {
+    /// A refresh round: keeps every reading it got, and says which orgs it couldn't read.
+    func ingest(_ outcome: UsageRound.Outcome, claudeCodeOrg: String?, at time: Date) {
         let wasRed = currentOrgIsRed
         now = time
         self.claudeCodeOrg = claudeCodeOrg
-        for r in readings { latest[r.org] = r }
-        history.append(contentsOf: readings)
-        try? store.append(readings)
+        for r in outcome.readings { latest[r.org] = r }
+        history = Self.recent(history + outcome.readings, now: time)
+        try? store.append(outcome.readings)
         signedIn = true
-        lastError = nil
+        session.worked()
+        problem = Copy.problem(outcome.failures, shown: orgs.count)
+        orgProblems = Dictionary(outcome.failures.map { ($0.org.id, $0.problem) }, uniquingKeysWith: { a, _ in a })
+        refreshProblem = outcome.readings.isEmpty ? outcome.failures.first?.problem : nil
         updateAdvice()
         if !wasRed, currentOrgIsRed, let org = orgs.first(where: { $0.id == claudeCodeOrg }) { onRed?(org) }
     }
 
+    /// Nothing could be read this time (not even the org list).
+    func refreshFailed(_ problem: RefreshProblem) {
+        self.problem = Copy.problem(problem)
+        refreshProblem = problem
+    }
+
+    /// claude.ai says the session is over. Worth a notification only if it worked earlier in
+    /// this run, not when launching signed out.
+    func sessionEnded() {
+        signedIn = false
+        clearProblems()
+        if session.ended() { onSignedOut?() }
+    }
+
+    /// The owner signed out from the menu.
+    func signedOut() {
+        signedIn = false
+        clearProblems()
+        session = SessionWatch()
+    }
+
+    /// Whether an org's reading is current; an org that stopped reading keeps its last one.
+    func isFresh(_ org: Org) -> Bool { latest[org.id]?.isFresh(now: now) ?? false }
+
+    private func clearProblems() {
+        problem = nil
+        orgProblems = [:]
+        refreshProblem = nil
+    }
+
     func setClaudeCodeOrg(_ id: String?) {
-        guard id != claudeCodeOrg else { return }
+        guard id != claudeCodeOrg, !showingDemo else { return }
         claudeCodeOrg = id
         updateAdvice()
     }
@@ -108,6 +161,7 @@ final class AppModel: ObservableObject {
 
     func apply(_ scenario: DemoScenario) {
         primaryOverride = scenario.primary
+        clearProblems()
         orgs = scenario.orgs
         latest = Dictionary(uniqueKeysWithValues: scenario.readings.map { ($0.org, $0) })
         history = []
@@ -120,10 +174,11 @@ final class AppModel: ObservableObject {
 
     func leaveDemo() {
         primaryOverride = nil
+        clearProblems()
         orgs = []
         latest = [:]
         advice = nil
-        history = store.load()
+        history = Self.recent(store.load(), now: Date())
         now = Date()
     }
 }

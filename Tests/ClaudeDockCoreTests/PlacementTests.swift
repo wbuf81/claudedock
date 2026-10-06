@@ -45,12 +45,70 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
     }
 }
 
+/// The Dock's width, which macOS doesn't report, estimated from what it holds.
+@Suite struct DockWidthTests {
+    // Measured on this display: 21 items (apps, a folder, two minimized windows, the Trash)
+    // and 2 dividers made a Dock 1503.5 pt wide.
+    @Test func matchesTheMeasuredDock() {
+        let width = DockFit.estimatedWidth(items: 21, dividers: 2, screen: screen, visible: visibleWithDock)
+        #expect(width.map { near($0, 1503.5, 2) } == true)
+    }
+
+    @Test func noWidthWhenTheDockIsHiddenOrOnASide() {
+        #expect(DockFit.estimatedWidth(items: 21, dividers: 2, screen: screen, visible: screen) == nil)
+        let leftDock = CGRect(x: 90, y: 0, width: 2470, height: 1440)
+        #expect(DockFit.estimatedWidth(items: 21, dividers: 2, screen: screen, visible: leftDock) == nil)
+    }
+
+    // Finder, the pinned apps, a section of running-but-unpinned and recent apps, the pinned
+    // folders and the Trash, with a divider before the recent section and the folders.
+    @Test func countsWhatTheDockShows() {
+        let pinned = (1...13).map { "app.pinned\($0)" }
+        let contents = DockFit.contents(pinned: pinned, recent: ["app.mail", "app.preview", "app.chrome"],
+                                        running: ["com.apple.finder", "app.pinned1", "app.mail", "app.preview"],
+                                        folders: 1, showRecents: true)
+        #expect(contents.items == 19 && contents.dividers == 2)
+        let noRecents = DockFit.contents(pinned: pinned, recent: ["app.chrome"], running: ["com.apple.finder"],
+                                         folders: 1, showRecents: false)
+        #expect(noRecents.items == 16 && noRecents.dividers == 1)
+        let manyRecents = DockFit.contents(pinned: [], recent: ["a", "b", "c", "d", "e"], running: [],
+                                           folders: 0, showRecents: true)
+        #expect(manyRecents.items == 5 && manyRecents.dividers == 2)
+    }
+
+    @Test func neverWiderThanTheScreen() {
+        #expect(DockFit.estimatedWidth(items: 80, dividers: 2, screen: screen, visible: visibleWithDock) == 2560)
+    }
+}
+
 @Suite struct WidgetPlacementTests {
     let size = CGSize(width: 570, height: 82)
 
     @Test func defaultsToTheCornerBesideTheDock() {
         #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: nil)
                 == CGPoint(x: 1978, y: 6))
+    }
+
+    @Test func bottomCornersSitBesideADockThatLeavesRoom() {
+        let dock = DockFit.estimatedWidth(items: 21, dividers: 2, screen: screen, visible: visibleWithDock)
+        let size = CGSize(width: 497, height: 82)
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: nil, dockWidth: dock)
+                == CGPoint(x: 2051, y: 6))
+        #expect(WidgetPlacement.origin(size: size, screen: screen, visible: visibleWithDock, spot: .snapped(.bottomLeft), dockWidth: dock)
+                == CGPoint(x: 12, y: 6))
+    }
+
+    // A 13-inch MacBook Air with 48 pt icons and a typical Dock: the corner beside the Dock
+    // is under it, so the widget sits just above the Dock instead.
+    @Test func bottomCornersRiseAboveADockTheyWouldOverlap() {
+        let air = CGRect(x: 0, y: 0, width: 1470, height: 956)
+        let visible = CGRect(x: 0, y: 74, width: 1470, height: 857)
+        let dock = DockFit.estimatedWidth(items: 18, dividers: 2, screen: air, visible: visible)
+        let size = CGSize(width: 497, height: 66)
+        #expect(WidgetPlacement.origin(size: size, screen: air, visible: visible, spot: nil, dockWidth: dock)
+                == CGPoint(x: 961, y: 86))
+        #expect(WidgetPlacement.origin(size: size, screen: air, visible: visible, spot: .snapped(.bottomLeft), dockWidth: dock)
+                == CGPoint(x: 12, y: 86))
     }
 
     @Test func sideOrHiddenDockStaysInsideTheVisibleFrame() {
@@ -88,8 +146,9 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
 
     @Test func opensAboveAWidgetAtTheBottom() {
         let widget = CGRect(x: 1978, y: 6, width: 570, height: 82)
+        // Clear of the Dock's band (the visible frame starts at 90), not just the widget.
         #expect(WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: visibleWithDock)
-                == CGRect(x: 2176, y: 96, width: 372, height: 700))
+                == CGRect(x: 2176, y: 98, width: 372, height: 700))
     }
 
     @Test func opensBelowAWidgetNearTheTop() {
@@ -118,7 +177,7 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         let short = CGRect(x: 0, y: 90, width: 2560, height: 600)
         let widget = CGRect(x: 1978, y: 6, width: 570, height: 82)
         let frame = WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: short)
-        #expect(frame.minY == 96 && frame.maxY == 682)
+        #expect(frame.minY == 98 && frame.maxY == 682)
     }
 }
 

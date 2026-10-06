@@ -43,18 +43,26 @@ public enum SwitchAdvisor {
         }
     }
 
+    /// Only orgs with a current reading count: an old one can look emptier than the org is.
     public static func advice(_ orgs: [OrgStatus], claudeCodeOrg: String?, now: Date,
                               formatting: Formatting, _ t: Thresholds) -> Advice? {
+        let orgs = orgs.filter { $0.reading.isFresh(now: now) }
         guard let current = orgs.first(where: { $0.org.id == claudeCodeOrg }),
               let best = best(orgs, now: now, t), best.org.id != current.org.id else { return nil }
         return Advice(target: best.org, reason: reason(current: current, best: best, now: now, formatting: formatting, t))
     }
 
-    /// The panel's top line.
+    /// The panel's top line. `hidden` is the orgs the owner chose not to show.
     public static func statusLine(_ orgs: [OrgStatus], claudeCodeOrg: String?, advice: Advice?, now: Date,
-                                  formatting: Formatting, _ t: Thresholds) -> String {
+                                  formatting: Formatting, _ t: Thresholds, hidden: [Org] = []) -> String {
         if let advice { return "Move Claude Code to \(advice.target.name): \(advice.reason)." }
-        if !orgs.isEmpty, !orgs.contains(where: { isEligible($0, t) }) {
+        if let org = hidden.first(where: { $0.id == claudeCodeOrg }) {
+            return "Claude Code is on \(org.name), which isn't shown here. Turn it on in Settings to follow it."
+        }
+        // One org has nothing to switch between; its dot and TODAY box say the rest.
+        let orgs = orgs.filter { $0.reading.isFresh(now: now) }
+        guard orgs.count > 1 else { return "" }
+        if !orgs.contains(where: { isEligible($0, t) }) {
             let low = orgs.count == 2 ? "Both orgs are low." : "Every org is low."
             let back = orgs.compactMap { s -> (OrgStatus, Date)? in
                 let date = s.reading.weekLeft < minimumWeekLeft(s.role, t) ? s.reading.weekResetsAt : s.reading.sessionResetsAt

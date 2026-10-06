@@ -1,18 +1,28 @@
 import Foundation
 
-/// Short time and number text used across the widget and panel.
+/// Short time and number text used across the widget and panel. The words are English, so
+/// day names are too; the clock is 12- or 24-hour as the Mac's region prefers.
 public struct Formatting: Sendable {
     public var calendar: Calendar
-    public var locale: Locale
+    public var twentyFourHour: Bool
+    private let locale = Locale(identifier: "en_US_POSIX")
 
-    public init(calendar: Calendar = .current, locale: Locale = Locale(identifier: "en_US_POSIX")) {
+    /// The calendar follows the Mac's time zone as it changes.
+    public init(calendar: Calendar = .autoupdatingCurrent, twentyFourHour: Bool = Formatting.prefers24Hour()) {
         self.calendar = calendar
-        self.locale = locale
+        self.twentyFourHour = twentyFourHour
+    }
+
+    /// Whether a region writes times on a 24-hour clock.
+    public static func prefers24Hour(_ locale: Locale = .autoupdatingCurrent) -> Bool {
+        !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: locale) ?? "a").contains("a")
     }
 
     /// "4:20 PM" or "4 PM" on the same day as `now`; "Fri 4 AM" or "Wed 9:30 PM" otherwise.
+    /// On a 24-hour clock: "16:20", "Fri 04:00".
     public func dayTime(_ date: Date, now: Date) -> String {
-        let time = format(date, calendar.component(.minute, from: date) == 0 ? "h a" : "h:mm a")
+        let pattern = twentyFourHour ? "HH:mm" : calendar.component(.minute, from: date) == 0 ? "h a" : "h:mm a"
+        let time = format(date, pattern)
         return calendar.isDate(date, inSameDayAs: now) ? time : "\(format(date, "EEE")) \(time)"
     }
 

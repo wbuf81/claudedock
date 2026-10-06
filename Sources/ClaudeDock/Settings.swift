@@ -8,7 +8,8 @@ final class Settings: ObservableObject {
 
     @Published var thresholds: Thresholds { didSet { save(thresholds, "thresholds") } }
     @Published var primaryOrg: String? { didSet { defaults.set(primaryOrg, forKey: "primaryOrg") } }
-    @Published var shownOrgs: [String]? { didSet { defaults.set(shownOrgs, forKey: "shownOrgs") } }
+    /// Org id → shown, for the orgs the owner turned on or off; the rest follow the default.
+    @Published var orgChoices: [String: Bool] { didSet { defaults.set(orgChoices, forKey: "orgChoices") } }
     @Published var knownOrgs: [Org] { didSet { save(knownOrgs, "knownOrgs") } }
     @Published var notifySwitch: Bool { didSet { defaults.set(notifySwitch, forKey: "notifySwitch") } }
     @Published var notifyRed: Bool { didSet { defaults.set(notifyRed, forKey: "notifyRed") } }
@@ -23,8 +24,11 @@ final class Settings: ObservableObject {
         self.defaults = defaults
         thresholds = Self.load(Thresholds.self, "thresholds", defaults) ?? Thresholds()
         primaryOrg = defaults.string(forKey: "primaryOrg")
-        shownOrgs = defaults.stringArray(forKey: "shownOrgs")
-        knownOrgs = Self.load([Org].self, "knownOrgs", defaults) ?? []
+        let known = Self.load([Org].self, "knownOrgs", defaults) ?? []
+        knownOrgs = known
+        // Earlier versions saved the list of shown orgs.
+        orgChoices = defaults.dictionary(forKey: "orgChoices") as? [String: Bool]
+            ?? defaults.stringArray(forKey: "shownOrgs").map { OrgFilter.choices(fromShown: $0, known: known) } ?? [:]
         notifySwitch = defaults.object(forKey: "notifySwitch") as? Bool ?? true
         notifyRed = defaults.object(forKey: "notifyRed") as? Bool ?? true
         demoMode = defaults.bool(forKey: "demoMode")
@@ -33,11 +37,18 @@ final class Settings: ObservableObject {
             ?? Self.load(WidgetOffset.self, "widgetOffset", defaults).map { .free($0) }
         layoutChoice = LayoutChoice(rawValue: defaults.string(forKey: "layoutChoice") ?? "") ?? .automatic
         sizeScale = WidgetLayout.clampSize(defaults.object(forKey: "sizeScale") as? Double ?? 1)
+        // Save the migration once; otherwise it would rerun on every launch against whatever
+        // orgs are known by then, hiding any joined since.
+        if defaults.object(forKey: "shownOrgs") != nil {
+            defaults.set(orgChoices, forKey: "orgChoices")
+            defaults.removeObject(forKey: "shownOrgs")
+        }
     }
 
-    /// The owner's picks, or by default every paid org (a free personal org has no billing type).
+    /// Whether an org is shown: the owner's choice, or by default every paid org (or every
+    /// org, for an account with none).
     func isShown(_ org: Org) -> Bool {
-        shownOrgs.map { $0.contains(org.id) } ?? (org.billingType != nil)
+        OrgFilter.shown(knownOrgs, choices: orgChoices).contains { $0.id == org.id }
     }
 
     private func save<T: Encodable>(_ value: T, _ key: String) {

@@ -48,6 +48,18 @@ import Testing
         #expect(reload)
     }
 
+    // A script killed by a load that's already running mustn't start a second load, which
+    // would cancel the first and report it as "no connection".
+    @Test func aFailedScriptDuringALoadLeavesTheLoadRunning() {
+        var page = PageLoadState()
+        _ = page.claimLoad()
+        page.invalidate()
+        let second = page.claimLoad()
+        #expect(!second)
+        page.finished(ok: true)
+        #expect(page.isReady)
+    }
+
     @Test func failedLoadCanBeRetried() {
         var page = PageLoadState()
         _ = page.claimLoad()
@@ -55,5 +67,16 @@ import Testing
         #expect(!page.isReady)
         let retry = page.claimLoad()
         #expect(retry)
+    }
+}
+
+@Suite struct SessionWatchTests {
+    // Launching while signed out isn't news; losing a session that worked is.
+    @Test func onlyASessionThatWorkedCanEnd() {
+        var watch = SessionWatch()
+        #expect(watch.ended() == false)
+        watch.worked()
+        #expect(watch.ended() == true)
+        #expect(watch.ended() == false)
     }
 }

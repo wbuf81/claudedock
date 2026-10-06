@@ -7,6 +7,10 @@ MainActor.assumeIsolated {
         Renderer.renderDemo(to: URL(fileURLWithPath: arguments[flag + 1]))
         exit(0)
     }
+    if let flag = arguments.firstIndex(of: "--matrix"), flag + 1 < arguments.count {
+        Showcase.renderMatrix(to: URL(fileURLWithPath: arguments[flag + 1]))
+        exit(0)
+    }
     if let flag = arguments.firstIndex(of: "--showcase"), flag + 1 < arguments.count {
         Showcase.render(to: URL(fileURLWithPath: arguments[flag + 1]))
         exit(0)

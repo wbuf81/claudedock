@@ -47,7 +47,10 @@ at the end of the week. Claude Dock answers that at a glance, without opening a 
 | **⇄ tab** | Appears only when Claude Code should switch orgs, e.g. `Charizard first`. |
 
 It's as tall as your Dock, its rings are the size of your Dock icons, and it uses the same
-clear Liquid Glass, so it looks like part of the Dock.
+clear Liquid Glass, so it looks like part of the Dock. Hover over an org for the whole
+story in a sentence (VoiceOver reads the same).
+
+With one org, there's nothing to switch between, so you just get the ring, bar and dot.
 
 ## Put it anywhere
 
@@ -105,14 +108,29 @@ doesn't swing the forecast.
 
 ## Install
 
-Needs macOS 14 or later and the Xcode Command Line Tools (`xcode-select --install`).
+**You need** macOS 14 or later and a Swift 6 toolchain: Xcode 16 or later, or just its
+Command Line Tools (`xcode-select --install`). The clear Liquid Glass look needs macOS 26
+and the tools that come with it (Xcode 26 or Command Line Tools 26); with older tools, or on
+an older macOS, it builds and runs with a frosted card instead.
 
 ```sh
 git clone https://github.com/wbuf81/claudedock.git
 cd claudedock
-./build.sh                      # builds build/Claude Dock.app (Apple Silicon + Intel)
-open "build/Claude Dock.app"    # first launch asks you to sign in to claude.ai once
+./build.sh                                        # 1–2 minutes the first time; Apple Silicon + Intel
+rm -rf "/Applications/Claude Dock.app"            # an older copy, when updating (quit it first)
+cp -R "build/Claude Dock.app" /Applications/
+open "/Applications/Claude Dock.app"
 ```
+
+**The first time it opens:**
+
+1. A window asks you to sign in to claude.ai, once. Google and single sign-on work in it.
+   If you sign in by email, claude.ai emails a link that would open in your browser: copy
+   the link instead, then click **Open copied sign-in link**.
+2. The widget appears at the bottom right, beside the Dock, or just above it when the Dock
+   reaches that corner.
+3. Run from Applications, it adds itself to your login items (turn that off in Settings).
+4. macOS asks about notifications the first time there's something to tell you.
 
 Then:
 
@@ -123,13 +141,26 @@ Then:
 - **Settings** picks which orgs to show and which one the desktop app shares, sets every
   threshold, toggles notifications, and has a **demo mode** with Pokémon sample data.
 
-It launches at login, and sends a notification when Claude Code should switch orgs or when
-the org it's on turns red.
+It sends a notification when Claude Code should switch orgs, when the org it's on turns
+red, and if claude.ai signs it out.
+
+### Things to know
+
+- **It lives on your main display**, the one with the menu bar.
+- **The Dock's width is estimated** from what's in it (macOS doesn't say). Minimized windows
+  can't be counted, so with several of them the widget may overlap the Dock's end: drag it
+  away, or right-click → **Position**.
+- **With the Dock hidden or on a side**, the bottom-right corner floats over your windows,
+  as the widget always stays on top. Move it wherever suits you.
+- **When something goes wrong** (offline, signed out, claude.ai changed), the widget greys
+  out and says what happened rather than guessing; the panel has the details.
+- **English only**, though times follow your region's 12- or 24-hour clock.
 
 ## Privacy
 
 - Claude Dock signs in to claude.ai in **its own private web view**, separate from your
-  browsers and the Claude desktop app. Sign out in the menu deletes that session.
+  browsers and the Claude desktop app. **Sign out** in the menu deletes everything in that
+  web view, including any Google or single sign-on cookies from signing in.
 - It only **reads**: GET requests to claude.ai's usage endpoints every 3 minutes. It never
   sends chats, changes settings or touches billing.
 - It reads **one field** from `~/.claude.json`: which org Claude Code is signed into.
@@ -139,6 +170,21 @@ the org it's on turns red.
 claude.ai's usage endpoints are not a public API and may change; if they do, the widget
 greys out and shows when it last updated rather than guessing.
 
+## Uninstall
+
+Quit Claude Dock (right-click → **Quit**), turn it off in System Settings → General →
+Login Items, then delete the app and what it keeps (your claude.ai session lives in the
+WebKit folder, so this signs it out for good):
+
+```sh
+rm -rf "/Applications/Claude Dock.app" \
+  ~/Library/Application\ Support/ClaudeDock \
+  ~/Library/WebKit/com.wbuf81.claudedock \
+  ~/Library/HTTPStorages/com.wbuf81.claudedock* \
+  ~/Library/Caches/com.wbuf81.claudedock
+defaults delete com.wbuf81.claudedock
+```
+
 ## Developing
 
 ```sh
@@ -147,9 +193,11 @@ greys out and shows when it last updated rather than guessing.
 "build/Claude Dock.app/Contents/MacOS/ClaudeDock" --showcase DIR  # the README images
 ```
 
-`ClaudeDockCore` holds all the logic (parsing, pace, stoplight, switch advice, chart
-geometry, the on-screen sentences) as pure, tested Swift; `ClaudeDock` is the AppKit +
-SwiftUI app around it. The design spec and implementation plan live in
+`ClaudeDockCore` holds all the logic (parsing, pace, stoplight, switch advice, placement,
+chart geometry, the on-screen sentences) as pure, tested Swift; `ClaudeDock` is the AppKit +
+SwiftUI app around it. Running `./build.sh` while a copy from `build/` is open quits it and
+reopens the new one. Before sharing a change, work through the
+[manual checks](docs/manual-checks.md) the tests can't cover. The design spec and implementation plan live in
 [`docs/superpowers/`](docs/superpowers/). `test.sh` exists because, with only the Command
 Line Tools installed, SwiftPM can't find the Swift Testing macro plugin on its own.
 

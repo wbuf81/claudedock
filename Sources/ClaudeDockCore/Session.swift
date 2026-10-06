@@ -1,5 +1,18 @@
 import Foundation
 
+/// What can go wrong asking claude.ai for something.
+public enum WebSessionError: Error, Equatable, Sendable {
+    case signedOut
+    /// A JSON 403: the session may be gone, or only one org's access.
+    case forbidden
+    /// The site's bot check answered instead of the API.
+    case blocked
+    /// The hidden page didn't load.
+    case notReady
+    case badResult
+    case http(Int)
+}
+
 /// How the app should treat a claude.ai response.
 public enum SessionResponse: Equatable, Sendable {
     case ok
@@ -43,5 +56,25 @@ public struct PageLoadState: Equatable, Sendable {
 
     public mutating func finished(ok: Bool) { phase = ok ? .ready : .needsLoad }
 
-    public mutating func invalidate() { phase = .needsLoad }
+    /// The page broke. While a load is running this is that load replacing the page (which
+    /// kills scripts on the old one), so the load carries on.
+    public mutating func invalidate() {
+        if phase == .ready { phase = .needsLoad }
+    }
+}
+
+/// Whether a sign-out is news. Launching while signed out isn't; losing a session that
+/// worked during this run is, once.
+public struct SessionWatch: Sendable {
+    private var working = false
+
+    public init() {}
+
+    public mutating func worked() { working = true }
+
+    /// The session just ended: true when it had worked, so the owner should hear about it.
+    public mutating func ended() -> Bool {
+        defer { working = false }
+        return working
+    }
 }

@@ -20,7 +20,7 @@ struct WeekRing: View {
             Capsule().fill(Color.primary).frame(width: 2 * k, height: 6 * k)
                 .offset(y: -19.5 * k)
                 .rotationEffect(.degrees(elapsed * 360))
-            Text(Formatting.percent(used)).font(.system(size: 10.5 * k, weight: .bold))
+            Text(Formatting.percent(used)).font(.system(size: max(10.5 * k, 9.5), weight: .bold))
         }
         .frame(width: 36 * k, height: 36 * k)
         .frame(width: size, height: size)

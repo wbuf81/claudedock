@@ -29,4 +29,5 @@ func reading(
 
 func near(_ a: Double, _ b: Double, _ tolerance: Double = 0.05) -> Bool { abs(a - b) <= tolerance }
 
-let fmt = Formatting(calendar: newYork)
+/// A 12-hour clock, whatever the Mac running the tests prefers.
+let fmt = Formatting(calendar: newYork, twentyFourHour: false)

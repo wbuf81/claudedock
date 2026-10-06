@@ -13,6 +13,7 @@ final class Poller {
     private var failures = 0
     private var orgsFetchedAt: Date?
     private var accountModified: Date?
+    private var inFlight: Task<Void, Never>?
     private let delays: [TimeInterval] = [180, 360, 720, 900]
 
     init(model: AppModel, session: ClaudeWebSession, account: ClaudeCodeAccount) {
@@ -48,7 +49,17 @@ final class Poller {
         loop = nil
     }
 
+    /// Refreshes, or waits for the refresh already running (the loop, the Refresh button,
+    /// opening the panel and Settings can all ask at once).
     func refresh() async {
+        if let inFlight { return await inFlight.value }
+        let task = Task { await refreshNow() }
+        inFlight = task
+        await task.value
+        inFlight = nil
+    }
+
+    private func refreshNow() async {
         guard !model.settings.demoMode else { return }
         do {
             if model.orgs.isEmpty || (orgsFetchedAt.map { Date().timeIntervalSince($0) > 86_400 } ?? true) {
@@ -57,27 +68,32 @@ final class Poller {
                 orgsFetchedAt = Date()
             }
             let now = Date()
-            var readings: [Reading] = []
-            for org in model.orgs {
-                let data = try await session.getJSON("/api/organizations/\(org.id)/usage")
-                readings.append(try UsageParser.reading(from: data, org: org.id, at: now))
+            let outcome = try await UsageRound.run(model.orgs, at: now) { [session] org in
+                try await session.getJSON("/api/organizations/\(org.id)/usage")
             }
-            model.ingest(readings, claudeCodeOrg: account.currentOrg(), at: now)
-            failures = 0
+            // A JSON 403 can mean the session is gone or only that org refused; when every
+            // org refused, the org list tells which.
+            if outcome.readings.isEmpty, outcome.failures.contains(where: { $0.problem == .refused }),
+               await sessionIsGone() {
+                model.sessionEnded()
+                return
+            }
+            model.ingest(outcome, claudeCodeOrg: account.currentOrg(), at: now)
+            // Back off only when nothing worked: one org that never reads (a free plan, say)
+            // mustn't slow down the others.
+            failures = outcome.readings.isEmpty && !outcome.failures.isEmpty ? failures + 1 : 0
         } catch WebSessionError.signedOut {
-            model.signedIn = false
+            model.sessionEnded()
         } catch WebSessionError.forbidden {
-            // A JSON 403 can mean the session is gone or only that one org refused; the org
-            // list tells which.
             if await sessionIsGone() {
-                model.signedIn = false
+                model.sessionEnded()
             } else {
                 failures += 1
-                model.lastError = "an org refused access"
+                model.refreshFailed(.refused)
             }
         } catch {
             failures += 1
-            model.lastError = String(describing: error)
+            model.refreshFailed(RefreshProblem(error))
         }
     }
 

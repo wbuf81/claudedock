@@ -33,6 +33,9 @@ public struct WeekChartModel: Equatable, Sendable {
     public var resetLabelMeetsToday = false
     /// Near the right edge the "now" label would run off the chart, so put it left of the dot.
     public var nowLabelOnLeft = false
+    /// High in the chart the "now" label goes below the dot; low in the chart, above it, so it
+    /// never runs into the axis.
+    public var nowLabelBelow = false
 
     public static func make(axis: WeekAxis, now: Date, reading: Reading, forecast: WeekForecast?,
                             history: [Reading]) -> WeekChartModel {
@@ -51,6 +54,7 @@ public struct WeekChartModel: Equatable, Sendable {
                                    past: clip(past, axis), useItAll: [], yourPace: [], unused: [],
                                    resetX: nil, nextWindow: [], days: axis.days)
         model.nowLabelOnLeft = model.nowX > 0.8
+        model.nowLabelBelow = model.nowY >= 0.45
         guard let reset = reading.weekResetsAt, let forecast else { return model }
 
         let allLine = [(now, reading.week), (reset, 100.0)]
