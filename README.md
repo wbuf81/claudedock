@@ -11,7 +11,27 @@ bottom-right corner at Dock height and shows, for each Claude organization you b
 Click it for a panel with a week chart, a daily target, the model-specific weekly limit,
 and advice on which organization Claude Code should be signed into.
 
-Status: in design. The spec lives in `docs/superpowers/specs/`.
+## Build and run
+
+Needs macOS 14+ and the Xcode Command Line Tools (`xcode-select --install`).
+
+```sh
+./build.sh                      # builds build/Claude Dock.app
+open "build/Claude Dock.app"    # first launch asks you to sign in to claude.ai once
+./test.sh                       # unit tests
+```
+
+Claude Dock signs in to claude.ai in its own private web view and only reads your usage
+(GET requests to claude.ai's usage endpoints, every 3 minutes). It reads one field from
+`~/.claude.json` to see which org Claude Code is signed into. History stays in
+`~/Library/Application Support/ClaudeDock/`. These endpoints are not a public API and may
+change.
+
+Settings has a demo mode with Pokémon sample data (Pikachu and Charizard), and
+`"build/Claude Dock.app/Contents/MacOS/ClaudeDock" --render DIR` draws every demo state to
+PNGs.
+
+The design spec and implementation plan live in `docs/superpowers/`.
 
 ## Contributing safely
 
