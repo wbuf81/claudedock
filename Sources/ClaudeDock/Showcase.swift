@@ -46,6 +46,61 @@ enum Showcase {
         "Pikachu is on pace (yellow) but down to its last 12%, so Charizard, whose week hasn't started (steady green), goes first.",
     ]
 
+    /// `--matrix DIR`: the widget across org counts, name lengths, layouts and sizes, and the
+    /// panel with one and three orgs, in dark and light, on sheets for checking by eye.
+    static func renderMatrix(to dir: URL) {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 11, minute: 32))!
+        let settings = Settings(defaults: UserDefaults(suiteName: "ClaudeDockMatrix")!)
+        let history = dir.appendingPathComponent("matrix-history.jsonl")
+        func at(_ hours: Double) -> Date { now.addingTimeInterval(hours * 3600) }
+        func reading(_ org: Org, _ week: Double, _ reset: Double, _ session: Double, _ sessionReset: Double?) -> Reading {
+            Reading(time: now, org: org.id, session: session, sessionResetsAt: sessionReset.map(at),
+                    week: week, weekResetsAt: at(reset), scoped: ["Fable": 20])
+        }
+        let pikachu = Org(id: "m-pikachu", name: "Pikachu", billingType: "x")
+        let charizard = Org(id: "m-charizard", name: "Charizard", billingType: "x")
+        let bulbasaur = Org(id: "m-bulbasaur", name: "Bulbasaur", billingType: "x")
+        let longA = Org(id: "m-long-a", name: "Team Rocket Pikachu Research Division", billingType: "x")
+        let longB = Org(id: "m-long-b", name: "Team Rocket Charizard Field Operations", billingType: "x")
+        let sets: [(String, [Org], [Reading])] = [
+            ("1 org", [pikachu], [reading(pikachu, 55, 64, 19, 3)]),
+            ("2 orgs", [pikachu, charizard], [reading(pikachu, 55, 64, 19, 3), reading(charizard, 95, 33, 0, nil)]),
+            ("3 orgs", [pikachu, charizard, bulbasaur],
+             [reading(pikachu, 55, 64, 19, 3), reading(charizard, 95, 33, 0, nil), reading(bulbasaur, 30, 100, 82, 1)]),
+            ("long names", DisplayNames.short([longA, longB]),
+             [reading(longA, 55, 64, 19, 3), reading(longB, 20, 120, 5, 4)]),
+            ("long, unshortened", [longA, Org(id: "m-other", name: "Squirtle Platform Engineering Group", billingType: "x")],
+             [reading(longA, 55, 64, 19, 3), reading(Org(id: "m-other", name: "", billingType: nil), 20, 120, 5, 4)]),
+        ]
+        func model(_ set: (String, [Org], [Reading]), size: Double, vertical: Bool) -> AppModel {
+            let model = AppModel(settings: settings, store: HistoryStore(url: history))
+            model.apply(DemoScenario(name: set.0, orgs: set.1, primary: set.1[0].id, readings: set.2,
+                                     claudeCodeOrg: set.1[0].id, now: now))
+            model.widgetHeight = 82 * size
+            model.widgetScale = size
+            model.vertical = vertical
+            return model
+        }
+        for scheme in [ColorScheme.dark, .light] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            var rows: [(String, AppModel)] = []
+            for set in sets {
+                for size in [0.8, 1.0, 1.5] { rows.append(("\(set.0) · \(Int(size * 100))%", model(set, size: size, vertical: false))) }
+            }
+            write(MatrixSheet(rows: rows), size: CGSize(width: 1500, height: 2400), scheme: scheme, to: dir, "matrix-horizontal-\(suffix).png")
+            let strips = sets.map { ($0.0, model($0, size: 1, vertical: true)) }
+            write(StripSheet(strips: strips), size: CGSize(width: 900, height: 760), scheme: scheme, to: dir, "matrix-vertical-\(suffix).png")
+            write(HStack(alignment: .top, spacing: 24) {
+                PanelView(model: model(sets[0], size: 1, vertical: false), actions: .none).fixedSize()
+                PanelView(model: model(sets[2], size: 1, vertical: false), actions: .none).fixedSize()
+            }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(Wallpaper(dark: scheme == .dark)),
+                  size: CGSize(width: 860, height: 1200), scheme: scheme, to: dir, "matrix-panels-\(suffix).png")
+        }
+        try? FileManager.default.removeItem(at: history)
+        print("Matrix written to \(dir.path)")
+    }
+
     private static func write<V: View>(_ view: V, size: CGSize, scheme: ColorScheme, to dir: URL, _ name: String) {
         let framed = view
             .frame(width: size.width, height: size.height)
@@ -126,6 +181,44 @@ private struct SideScene: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
             .padding(.trailing, 6)
+        }
+    }
+}
+
+private struct MatrixSheet: View {
+    var rows: [(String, AppModel)]
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Wallpaper(dark: true)
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 20) {
+                        Text(row.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white).frame(width: 190, alignment: .leading)
+                        WidgetView(model: row.1, actions: .none).fixedSize()
+                    }
+                }
+            }
+            .padding(24)
+        }
+    }
+}
+
+private struct StripSheet: View {
+    var strips: [(String, AppModel)]
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Wallpaper(dark: true)
+            HStack(alignment: .top, spacing: 26) {
+                ForEach(Array(strips.enumerated()), id: \.offset) { _, strip in
+                    VStack(spacing: 10) {
+                        Text(strip.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
+                        WidgetView(model: strip.1, actions: .none).fixedSize()
+                    }
+                }
+            }
+            .padding(24)
         }
     }
 }

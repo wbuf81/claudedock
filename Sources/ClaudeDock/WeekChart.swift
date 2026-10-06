@@ -56,7 +56,7 @@ struct WeekChart: View {
             ctx.stroke(vertical(chart.nowX), with: .color(.primary), lineWidth: 1.5)
             let dot = pt(ChartPoint(x: chart.nowX, y: chart.nowY))
             ctx.fill(Path(ellipseIn: CGRect(x: dot.x - 4, y: dot.y - 4, width: 8, height: 8)), with: .color(lineColor))
-            let labelY = dot.y + 14 < plot.maxY ? dot.y + 12 : dot.y - 10
+            let labelY = chart.nowLabelBelow ? dot.y + 12 : dot.y - 10
             ctx.draw(Text("now · \(Formatting.percent(chart.nowY * 100))").font(.system(size: 9.5, weight: .semibold)).foregroundColor(.primary),
                      at: CGPoint(x: chart.nowLabelOnLeft ? dot.x - 6 : dot.x + 6, y: labelY),
                      anchor: chart.nowLabelOnLeft ? .trailing : .leading)

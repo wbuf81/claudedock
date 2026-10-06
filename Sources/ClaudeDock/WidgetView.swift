@@ -140,7 +140,11 @@ private struct OrgBlock: View {
         let ring = WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
                             color: light == .red ? Palette.crit : Palette.accent, size: 48 * k)
         let name = HStack(spacing: 6 * k) {
-            Text(org.name).font(.system(size: 13 * k, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+            Text(org.name)
+                .font(.system(size: max(13 * k, 11), weight: .semibold))
+                .lineLimit(vertical ? 2 : 1)
+                .multilineTextAlignment(vertical ? .center : .leading)
+                .minimumScaleFactor(0.75)
             StoplightDot(light: light, size: 9 * k)
         }
         let bar = UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
@@ -153,7 +157,7 @@ private struct OrgBlock: View {
                 name
                 bar.frame(width: 72 * k)
                 Text(caption.replacingOccurrences(of: " · ", with: "\n"))
-                    .font(.system(size: 11 * k, weight: .medium))
+                    .font(.system(size: max(11 * k, 10), weight: .medium))
                     .foregroundStyle(Color.primary.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .lineSpacing(1 * k)
@@ -167,7 +171,7 @@ private struct OrgBlock: View {
                     name
                     bar
                     Text(caption)
-                        .font(.system(size: 11 * k, weight: .medium))
+                        .font(.system(size: max(11 * k, 10), weight: .medium))
                         .foregroundStyle(Color.primary.opacity(0.75))
                         .lineLimit(1)
                 }

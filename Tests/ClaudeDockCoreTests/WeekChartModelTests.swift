@@ -71,6 +71,15 @@ import Testing
         #expect(!chart(reading(week: 55, weekResetsAt: local(2026, 10, 9, 4))).nowLabelOnLeft)
     }
 
+    // The "now" label goes on whichever side of the dot has room: below it high in the
+    // chart, above it low in the chart (below would run into the axis).
+    @Test func nowLabelSitsOnTheRoomierSide() {
+        #expect(chart(reading(week: 55, weekResetsAt: local(2026, 10, 9, 4))).nowLabelBelow)
+        #expect(chart(reading(week: 95, weekResetsAt: local(2026, 10, 7, 21))).nowLabelBelow)
+        #expect(!chart(reading(week: 30, weekResetsAt: local(2026, 10, 10, 15))).nowLabelBelow)
+        #expect(!chart(reading(week: 0, weekResetsAt: nil)).nowLabelBelow)
+    }
+
     // Review Focus 1
     @Test func weekNotStartedHasOnlyNow() {
         let c = chart(reading(week: 0, weekResetsAt: nil))
