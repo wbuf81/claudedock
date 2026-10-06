@@ -17,6 +17,8 @@ final class DockController {
     private var hiddenUntil: Date?
     private var dragStart: (mouse: NSPoint, origin: NSPoint)?
     private var pinchFactor: Double = 1
+    /// The owner scale the widget is drawn at now, after fitting it on screen.
+    private var appliedScale: Double = 1
     private var settingsChanges: AnyCancellable?
 
     init(model: AppModel, actions: WidgetActions) {
@@ -133,7 +135,12 @@ final class DockController {
         guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
         let settings = model.settings
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
-        let ownerScale = settings.sizeScale * pinchFactor
+        // The owner's size, shrunk only if the widget wouldn't fit on screen (size measured
+        // from what's drawn now, divided back to scale 1).
+        let current = content.fittingSize
+        let natural = CGSize(width: current.width / appliedScale, height: current.height / appliedScale)
+        let ownerScale = WidgetLayout.fittedScale(settings.sizeScale * pinchFactor, natural: natural,
+                                                  visible: screen.visibleFrame)
         let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
         let scale = DockFit.contentScale(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
         let vertical = WidgetLayout.isVertical(spot: settings.widgetSpot, choice: settings.layoutChoice)
@@ -141,6 +148,7 @@ final class DockController {
             model.widgetHeight = height  // these changes trigger another layout with the new size
             model.widgetScale = scale
             model.vertical = vertical
+            appliedScale = ownerScale
             return
         }
         guard dragStart == nil else { return }

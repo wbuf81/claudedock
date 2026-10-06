@@ -88,8 +88,9 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
 
     @Test func opensAboveAWidgetAtTheBottom() {
         let widget = CGRect(x: 1978, y: 6, width: 570, height: 82)
+        // Clear of the Dock's band (the visible frame starts at 90), not just the widget.
         #expect(WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: visibleWithDock)
-                == CGRect(x: 2176, y: 96, width: 372, height: 700))
+                == CGRect(x: 2176, y: 98, width: 372, height: 700))
     }
 
     @Test func opensBelowAWidgetNearTheTop() {
@@ -118,7 +119,7 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         let short = CGRect(x: 0, y: 90, width: 2560, height: 600)
         let widget = CGRect(x: 1978, y: 6, width: 570, height: 82)
         let frame = WidgetPlacement.panelFrame(panel: panel, widget: widget, visible: short)
-        #expect(frame.minY == 96 && frame.maxY == 682)
+        #expect(frame.minY == 98 && frame.maxY == 682)
     }
 }
 

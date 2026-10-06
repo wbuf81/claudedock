@@ -74,6 +74,13 @@ public enum WidgetLayout {
 
     /// The owner's size setting, as a multiple of the Dock-matched size.
     public static func clampSize(_ scale: Double) -> Double { min(max(scale, 0.6), 2) }
+
+    /// The owner's size, shrunk only as far as needed for the widget (whose size at scale 1
+    /// is `natural`) to fit inside the visible frame with 12 pt to spare on each side.
+    public static func fittedScale(_ wanted: Double, natural: CGSize, visible: CGRect) -> Double {
+        guard natural.width > 0, natural.height > 0 else { return wanted }
+        return min(wanted, (visible.width - 24) / natural.width, (visible.height - 24) / natural.height)
+    }
 }
 
 public enum WidgetPlacement {
@@ -133,14 +140,17 @@ public enum WidgetPlacement {
             let y = min(max(widget.midY - height / 2, visible.minY + 8), visible.maxY - height - 8)
             return CGRect(x: x, y: y, width: panel.width, height: height)
         }
-        let above = visible.maxY - (widget.maxY + 8) - 8
-        let below = (widget.minY - 8) - (visible.minY + 8)
+        // Clear of the widget and of the Dock's band (the Dock draws over other windows).
+        let bottom = max(widget.maxY + 8, visible.minY + 8)
+        let top = min(widget.minY - 8, visible.maxY - 8)
+        let above = visible.maxY - 8 - bottom
+        let below = top - (visible.minY + 8)
         let aligned = onLeft ? widget.minX : widget.maxX - panel.width
         let x = min(max(aligned, visible.minX + 8), visible.maxX - panel.width - 8)
         if above >= panel.height || above >= below {
-            return CGRect(x: x, y: widget.maxY + 8, width: panel.width, height: min(panel.height, above))
+            return CGRect(x: x, y: bottom, width: panel.width, height: min(panel.height, above))
         }
         let height = min(panel.height, below)
-        return CGRect(x: x, y: widget.minY - 8 - height, width: panel.width, height: height)
+        return CGRect(x: x, y: top - height, width: panel.width, height: height)
     }
 }
