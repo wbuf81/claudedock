@@ -1,0 +1,25 @@
+# This repo is public. The folders below hold mockups, test-browser output and
+# local data with real account names and usage, so they must never be committed.
+.superpowers/
+.playwright-mcp/
+
+# Build output
+build/
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Local data the app or its tools could write
+*.jsonl
+*.har
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.cookies
+.env
+.env.*
+private/
+
+.DS_Store

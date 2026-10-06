@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Last check before anything leaves this Mac: scan every commit being pushed,
+# including any that were committed with --no-verify.
+scanner="$(git rev-parse --show-toplevel)/.githooks/scan-sensitive.sh"
+zero=0000000000000000000000000000000000000000
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue   # deleting a branch
+  [ "$remote_sha" = "$zero" ] && remote_sha=""
+  "$scanner" --push "$remote_sha" "$local_sha" || status=1
+done
+exit $status
