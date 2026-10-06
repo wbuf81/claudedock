@@ -7,6 +7,8 @@ struct SettingsView: View {
     @ObservedObject var settings: Settings
     var setDemoMode: (Bool) -> Void
     var signInOut: () -> Void
+    var dockAccessAllowed: () -> Bool
+    var askDockAccess: () -> Void
 
     var body: some View {
         Form {
@@ -47,6 +49,12 @@ struct SettingsView: View {
                         settings.objectWillChange.send()
                     }))
                 Toggle("Demo mode (Pokémon sample data)", isOn: Binding(get: { settings.demoMode }, set: setDemoMode))
+                if dockAccessAllowed() {
+                    Text("Claude Dock can see the Dock's size and steps out of its way.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button("Let Claude Dock see the Dock's size…", action: askDockAccess)
+                }
                 Button(model.signedIn ? "Sign out of claude.ai" : "Sign in to claude.ai", action: signInOut)
             }
         }

@@ -39,8 +39,8 @@ extension EnvironmentValues {
 }
 
 /// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
-/// Liquid Glass, the material the Dock is drawn with, so it follows the owner's Clear/Tinted
-/// and Reduce Transparency settings exactly as the Dock does. Otherwise a frosted material.
+/// clear Liquid Glass, which matched the Dock side by side (the regular variant reads
+/// noticeably whiter). Otherwise a frosted material.
 struct HUDBackground: ViewModifier {
     @Environment(\.solidBackground) private var solid
     @Environment(\.colorScheme) private var scheme
@@ -56,7 +56,7 @@ struct HUDBackground: ViewModifier {
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
                 .clipShape(shape)
         } else if glass, #available(macOS 26.0, *) {
-            content.clipShape(shape).glassEffect(.regular, in: shape)
+            content.clipShape(shape).glassEffect(.clear, in: shape)
         } else {
             content
                 .background(shape.fill(.regularMaterial))

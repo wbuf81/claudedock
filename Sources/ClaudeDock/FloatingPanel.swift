@@ -5,7 +5,7 @@ import AppKit
 final class FloatingPanel: NSPanel {
     private let allowsKey: Bool
 
-    init(allowsKey: Bool) {
+    init(allowsKey: Bool, shadow: Bool = true) {
         self.allowsKey = allowsKey
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isFloatingPanel = true
@@ -13,7 +13,7 @@ final class FloatingPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         backgroundColor = .clear
         isOpaque = false
-        hasShadow = true
+        hasShadow = shadow
         hidesOnDeactivate = false
         isMovable = false
     }

@@ -23,6 +23,12 @@ public enum DockFit {
     public static func contentScale(tileSize: Double?) -> Double {
         min(max((tileSize ?? defaultTileSize) / defaultTileSize, 0.75), 1.5)
     }
+
+    /// The Accessibility API measures from the top-left of the primary display, y down;
+    /// AppKit windows from its bottom-left, y up.
+    public static func screenFrame(fromAccessibility frame: CGRect, primaryHeight: Double) -> CGRect {
+        CGRect(x: frame.minX, y: primaryHeight - frame.maxY, width: frame.width, height: frame.height)
+    }
 }
 
 /// Where the owner dragged the widget, as distances from the screen's right and bottom edges
@@ -40,10 +46,19 @@ public struct WidgetOffset: Codable, Equatable, Sendable {
 public enum WidgetPlacement {
     /// The saved spot if there is one (pulled fully on screen), else the bottom-right corner:
     /// beside a bottom Dock at its height, or inside the visible frame for a side or hidden Dock.
-    public static func origin(size: CGSize, screen: CGRect, visible: CGRect, saved: WidgetOffset?) -> CGPoint {
+    /// When the Dock's real frame is known (`dock`, screen coordinates) and the Dock has grown
+    /// into the corner, the widget sits just above the Dock instead.
+    public static func origin(size: CGSize, screen: CGRect, visible: CGRect, saved: WidgetOffset?,
+                              dock: CGRect? = nil) -> CGPoint {
         let point: CGPoint
         if let saved {
             point = CGPoint(x: screen.maxX - saved.right - size.width, y: screen.minY + saved.bottom)
+        } else if let dock, dock.width > dock.height, dock.maxY > screen.minY + 1 {
+            // Centres line up: Accessibility reports the icon row, inset inside the glass bar,
+            // and the widget is as tall as the bar.
+            let x = visible.maxX - size.width - 12
+            let level = dock.midY - size.height / 2
+            point = CGPoint(x: x, y: x >= dock.maxX + 12 ? level : level + size.height + 8)
         } else {
             let dockAtBottom = visible.minY > screen.minY + 1
             point = CGPoint(x: visible.maxX - size.width - 12, y: dockAtBottom ? screen.minY + 6 : visible.minY + 12)

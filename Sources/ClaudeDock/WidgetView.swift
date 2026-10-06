@@ -62,12 +62,12 @@ private struct OrgBlock: View {
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow
         let red = light == .red
-        HStack(spacing: 8 * k) {
+        HStack(spacing: 12 * k) {
             WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
                      color: red ? Palette.crit : Palette.accent, size: 48 * k)
-            VStack(alignment: .leading, spacing: 3 * k) {
+            VStack(alignment: .leading, spacing: 5 * k) {
                 HStack(spacing: 6 * k) {
-                    Text(org.name).font(.system(size: 11 * k, weight: .semibold)).lineLimit(1)
+                    Text(org.name).font(.system(size: 13 * k, weight: .semibold)).lineLimit(1)
                     StoplightDot(light: light, size: 9 * k)
                 }
                 UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
@@ -76,15 +76,14 @@ private struct OrgBlock: View {
                     Copy.widgetSubline($0, light: light, forecast: forecast, now: model.now,
                                        formatting: model.formatting, model.settings.thresholds)
                 } ?? "no reading yet")
-                .font(.system(size: 9.5 * k))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11 * k, weight: .medium))
+                .foregroundStyle(Color.primary.opacity(0.75))
                 .lineLimit(1)
             }
-            .frame(width: 134 * k, alignment: .leading)
+            .frame(width: 150 * k, alignment: .leading)
         }
-        .padding(.leading, 7 * k)
-        .padding(.trailing, 11 * k)
+        .padding(.leading, 14 * k)
+        .padding(.trailing, 16 * k)
         .frame(maxHeight: .infinity)
-        .background(red ? Palette.crit.opacity(0.18) : Color.clear)
     }
 }

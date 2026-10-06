@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         registerLoginItemOnce()
         dock.show()
+        dock.requestDockAccessOnce()
         if settings.demoMode {
             startDemo()
         } else {
@@ -113,7 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let view = SettingsView(model: model, settings: model.settings,
                                     setDemoMode: { [weak self] in self?.setDemoMode($0) },
-                                    signInOut: { [weak self] in self?.signInOrOut() })
+                                    signInOut: { [weak self] in self?.signInOrOut() },
+                                    dockAccessAllowed: { [weak self] in self?.dock.dockWatcher.isAllowed ?? false },
+                                    askDockAccess: { [weak self] in self?.dock.dockWatcher.requestAccess() })
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Claude Dock Settings"
             window.styleMask = [.titled, .closable]
