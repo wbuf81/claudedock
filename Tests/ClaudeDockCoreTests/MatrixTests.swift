@@ -5,7 +5,7 @@ import Testing
 
 /// Sweeps the placement maths across the Macs, Docks, sizes and org counts other people
 /// will have, checking what must never happen: a widget off screen or under the menu bar or
-/// a side Dock, a panel off screen or on top of the widget.
+/// a side Dock or a bottom Dock, a panel off screen or on top of the widget.
 @Suite struct MatrixTests {
     struct Display {
         var name: String
@@ -25,6 +25,8 @@ import Testing
     ]
     static let tileSizes: [Double] = [32, 48, 64, 80]
     static let sizeScales: [Double] = [0.6, 0.8, 1, 1.25, 1.5, 2]
+    /// Items in the Dock (apps, folders, minimized windows, the Trash), from sparse to crowded.
+    static let dockItems = [8, 16, 24, 40]
 
     /// The visible frame macOS reports: minus the menu bar, and minus the Dock's reserved
     /// band (icon size + 42 pt, as measured) on whichever side it sits.
@@ -58,6 +60,9 @@ import Testing
             for side in DockSide.allCases {
                 for tile in Self.tileSizes {
                     let visible = Self.visible(display, side, tile: tile)
+                    for items in Self.dockItems {
+                    let dockWidth = DockFit.estimatedWidth(items: items, dividers: 2, screen: screen, visible: visible)
+                    let dock = dockWidth.map { CGRect(x: screen.midX - $0 / 2, y: screen.minY, width: $0, height: visible.minY - screen.minY) }
                     for orgs in 1...3 {
                         for spot in [nil] + SnapPoint.allCases.map({ WidgetSpot.snapped($0) }) {
                             let vertical = WidgetLayout.isVertical(spot: spot, choice: .automatic)
@@ -67,15 +72,19 @@ import Testing
                                 let scale = WidgetLayout.fittedScale(wanted, natural: natural, visible: visible)
                                 let size = Self.widgetSize(orgs: orgs, vertical: vertical, screen: screen,
                                                            visible: visible, tile: tile, scale: scale)
-                                let origin = WidgetPlacement.origin(size: size, screen: screen, visible: visible, spot: spot)
+                                let origin = WidgetPlacement.origin(size: size, screen: screen, visible: visible, spot: spot,
+                                                                    dockWidth: dockWidth)
                                 let widget = CGRect(origin: origin, size: size)
-                                let label = "\(display.name), Dock \(side) \(Int(tile)) pt, \(orgs) org(s), \(spot.map { "\($0)" } ?? "default"), size \(wanted)"
+                                let label = "\(display.name), Dock \(side) \(Int(tile)) pt with \(items) items, \(orgs) org(s), \(spot.map { "\($0)" } ?? "default"), size \(wanted)"
 
                                 if widget.minX < visible.minX - 0.5 || widget.maxX > visible.maxX + 0.5 {
                                     problems.append("\(label): widget under a side Dock or off screen \(widget)")
                                 }
                                 if widget.maxY > visible.maxY + 0.5 { problems.append("\(label): widget under the menu bar \(widget)") }
                                 if widget.minY < screen.minY - 0.5 { problems.append("\(label): widget below the screen \(widget)") }
+                                if let dock, widget.insetBy(dx: 1, dy: 1).intersects(dock) {
+                                    problems.append("\(label): widget under the Dock \(widget) vs \(dock)")
+                                }
 
                                 let panel = WidgetPlacement.panelFrame(panel: Self.panelSize(orgs: orgs), widget: widget, visible: visible)
                                 if panel.minX < visible.minX + 7.5 || panel.maxX > visible.maxX - 7.5
@@ -88,6 +97,7 @@ import Testing
                                 if panel.height < 240 { problems.append("\(label): panel squeezed to \(Int(panel.height)) pt") }
                             }
                         }
+                    }
                     }
                 }
             }

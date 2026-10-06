@@ -45,6 +45,12 @@ final class DockController {
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.layout() }
         }
+        // Apps that open or quit change the Dock's width.
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.layout() }
+            }
+        }
     }
 
     func show() {
@@ -104,7 +110,8 @@ final class DockController {
     func dragEnded() {
         dragStart = nil
         guard let screen = NSScreen.screens.first else { return }
-        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame) {
+        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame,
+                                            dockWidth: Self.dockWidth(on: screen)) {
             model.settings.widgetSpot = .snapped(point)
         } else {
             model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size,
@@ -163,11 +170,28 @@ final class DockController {
             return
         }
         guard dragStart == nil else { return }
-        let origin = WidgetPlacement.origin(size: content.fittingSize, screen: screen.frame,
-                                            visible: screen.visibleFrame, spot: settings.widgetSpot)
+        let origin = WidgetPlacement.origin(size: content.fittingSize, screen: screen.frame, visible: screen.visibleFrame,
+                                            spot: settings.widgetSpot, dockWidth: Self.dockWidth(on: screen))
         let frame = NSRect(origin: origin, size: content.fittingSize)
         if frame != widget.frame { widget.setFrame(frame, display: true) }
         if panel.isVisible { placePanel() }
+    }
+
+    /// The Dock's estimated width, from its settings and the apps running now.
+    private static func dockWidth(on screen: NSScreen) -> Double? {
+        let dock = UserDefaults(suiteName: "com.apple.dock")
+        // Spacers and web apps have no bundle id but still take a slot.
+        func apps(_ key: String) -> [String] {
+            (dock?.array(forKey: key) as? [[String: Any]] ?? []).enumerated().map { index, tile in
+                (tile["tile-data"] as? [String: Any])?["bundle-identifier"] as? String ?? "\(key)-\(index)"
+            }
+        }
+        let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.compactMap(\.bundleIdentifier)
+        let contents = DockFit.contents(pinned: apps("persistent-apps"), recent: apps("recent-apps"), running: running,
+                                        folders: dock?.array(forKey: "persistent-others")?.count ?? 0,
+                                        showRecents: dock?.object(forKey: "show-recents") as? Bool ?? true)
+        return DockFit.estimatedWidth(items: contents.items, dividers: contents.dividers,
+                                      screen: screen.frame, visible: screen.visibleFrame)
     }
 
     private func placePanel() {

@@ -30,6 +30,33 @@ public enum DockFit {
         return min(max(icons / defaultTileSize, 0.75), 1.5)
     }
 
+    /// What the Dock shows, from its settings and the running apps: Finder, the pinned apps,
+    /// a section of running apps that aren't pinned plus (with recents on) up to 3 recent
+    /// ones, the pinned folders, and the Trash. Dividers come before the recent section and
+    /// before the folders. Minimized windows can't be counted.
+    public static func contents(pinned: [String], recent: [String], running: [String], folders: Int,
+                                showRecents: Bool) -> (items: Int, dividers: Int) {
+        let pinnedSet = Set(pinned).union(["com.apple.finder"])
+        var section = running.filter { !pinnedSet.contains($0) }
+        if showRecents { section += recent.filter { !pinnedSet.contains($0) }.prefix(3) }
+        let middle = Set(section).count
+        return (1 + pinned.count + middle + folders + 1, (middle > 0 ? 1 : 0) + 1)
+    }
+
+    /// The Dock's width at the bottom of the screen, estimated from how many items it holds
+    /// (apps, folders, minimized windows, the Trash) and how many dividers split them, since
+    /// macOS doesn't say: the Dock's window covers the whole screen. nil when the Dock hides
+    /// or sits on a side.
+    ///
+    /// Measured on macOS 26 with a 90 pt reserved band: 68 pt per item, about 30 pt per
+    /// divider and 15 pt of padding, so 21 items and 2 dividers made 1503.5 pt. Items scale
+    /// with the band, like `height`.
+    public static func estimatedWidth(items: Int, dividers: Int, screen: CGRect, visible: CGRect) -> Double? {
+        let reserved = visible.minY - screen.minY
+        guard reserved > 20 else { return nil }
+        let item = reserved - 22
+        return min(Double(items) * item + Double(dividers) * item * 0.445 + 15, screen.width)
+    }
 }
 
 /// Where the owner dragged the widget, as distances from the screen's right and bottom edges
@@ -85,17 +112,23 @@ public enum WidgetLayout {
 
 public enum WidgetPlacement {
     /// The widget's origin for a spot (nil means bottom right), pulled fully on screen. The
-    /// bottom corners sit beside a bottom Dock at its height; everything else stays inside
-    /// the visible frame, so menu bar and side Docks are never covered.
-    public static func origin(size: CGSize, screen: CGRect, visible: CGRect, spot: WidgetSpot?) -> CGPoint {
-        let dockAtBottom = visible.minY > screen.minY + 1
-        let bottom = dockAtBottom ? screen.minY + 6 : visible.minY + 12
+    /// bottom corners sit beside a bottom Dock at its height, or just above it when the Dock
+    /// (`dockWidth` wide, centred) reaches the corner; everything else stays inside the
+    /// visible frame, so menu bar and side Docks are never covered.
+    public static func origin(size: CGSize, screen: CGRect, visible: CGRect, spot: WidgetSpot?,
+                              dockWidth: Double? = nil) -> CGPoint {
+        func bottom(atX x: Double) -> Double {
+            guard visible.minY > screen.minY + 1 else { return visible.minY + 12 }
+            guard let dockWidth else { return screen.minY + 6 }
+            let besideDock = x >= screen.midX + dockWidth / 2 + 8 || x + size.width <= screen.midX - dockWidth / 2 - 8
+            return besideDock ? screen.minY + 6 : visible.minY + 12
+        }
         let point: CGPoint
         switch spot {
         case .free(let saved)?:
             point = CGPoint(x: screen.maxX - saved.right - size.width, y: screen.minY + saved.bottom)
         case .snapped(.bottomLeft)?:
-            point = CGPoint(x: visible.minX + 12, y: bottom)
+            point = CGPoint(x: visible.minX + 12, y: bottom(atX: visible.minX + 12))
         case .snapped(.topRight)?:
             point = CGPoint(x: visible.maxX - size.width - 12, y: visible.maxY - size.height - 12)
         case .snapped(.topLeft)?:
@@ -105,7 +138,7 @@ public enum WidgetPlacement {
         case .snapped(.leftMiddle)?:
             point = CGPoint(x: visible.minX + 6, y: visible.midY - size.height / 2)
         case .snapped(.bottomRight)?, nil:
-            point = CGPoint(x: visible.maxX - size.width - 12, y: bottom)
+            point = CGPoint(x: visible.maxX - size.width - 12, y: bottom(atX: visible.maxX - size.width - 12))
         }
         return CGPoint(x: min(max(point.x, screen.minX), screen.maxX - size.width),
                        y: min(max(point.y, screen.minY), screen.maxY - size.height))
@@ -113,9 +146,9 @@ public enum WidgetPlacement {
 
     /// The snap point a drop lands on: a corner when the widget is within 60 pt of where it
     /// would sit there, or a side when it's within 60 pt of that edge and near its middle.
-    public static func snap(frame: CGRect, screen: CGRect, visible: CGRect) -> SnapPoint? {
+    public static func snap(frame: CGRect, screen: CGRect, visible: CGRect, dockWidth: Double? = nil) -> SnapPoint? {
         for corner in [SnapPoint.bottomRight, .bottomLeft, .topRight, .topLeft] {
-            let spot = origin(size: frame.size, screen: screen, visible: visible, spot: .snapped(corner))
+            let spot = origin(size: frame.size, screen: screen, visible: visible, spot: .snapped(corner), dockWidth: dockWidth)
             if hypot(spot.x - frame.minX, spot.y - frame.minY) <= 60 { return corner }
         }
         for side in [SnapPoint.rightMiddle, .leftMiddle] {
