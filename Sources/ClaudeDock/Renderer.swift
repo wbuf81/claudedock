@@ -25,7 +25,7 @@ enum Renderer {
     private static func write<V: View>(_ view: V, _ scheme: ColorScheme, _ url: URL) {
         let framed = view
             .environment(\.colorScheme, scheme)
-            .environment(\.solidBackground, true)
+            .environment(\.renderStyle, .solid)
             .padding(12)
             .background(scheme == .dark ? Color(white: 0.25) : Color(white: 0.85))
         let renderer = ImageRenderer(content: framed)

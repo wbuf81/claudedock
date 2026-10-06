@@ -26,22 +26,27 @@ enum Palette {
     }
 }
 
-/// `--render` can't draw translucent materials, so it asks for a solid background instead.
-private struct SolidBackgroundKey: EnvironmentKey {
-    static let defaultValue = false
+/// How cards are drawn. Image rendering can't draw live glass or materials, so `--render`
+/// asks for solid cards and `--showcase` for see-through ones over its own scene.
+enum RenderStyle {
+    case live, solid, showcase
+}
+
+private struct RenderStyleKey: EnvironmentKey {
+    static let defaultValue = RenderStyle.live
 }
 
 extension EnvironmentValues {
-    var solidBackground: Bool {
-        get { self[SolidBackgroundKey.self] }
-        set { self[SolidBackgroundKey.self] = newValue }
+    var renderStyle: RenderStyle {
+        get { self[RenderStyleKey.self] }
+        set { self[RenderStyleKey.self] = newValue }
     }
 }
 
 /// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
 /// clear Liquid Glass, tuned to match the Dock. Otherwise a frosted material.
 struct HUDBackground: ViewModifier {
-    @Environment(\.solidBackground) private var solid
+    @Environment(\.renderStyle) private var style
     @Environment(\.colorScheme) private var scheme
     var radius: CGFloat
     var glass: Bool
@@ -49,7 +54,12 @@ struct HUDBackground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius)
-        if solid {
+        if style == .showcase {
+            content
+                .background(shape.fill(scheme == .dark ? Color(white: 0.08).opacity(0.55) : Color.white.opacity(0.42)))
+                .overlay(shape.strokeBorder(Color.white.opacity(scheme == .dark ? 0.22 : 0.65), lineWidth: 1))
+                .clipShape(shape)
+        } else if style == .solid {
             content
                 .background(shape.fill(scheme == .dark ? Color(white: 0.11) : Color(white: 0.97)))
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))

@@ -17,8 +17,8 @@ struct WeekRing: View {
             Circle().trim(from: 0, to: used / 100)
                 .stroke(color, lineWidth: 6 * k)
                 .rotationEffect(.degrees(-90))
-            Capsule().fill(Color.primary).frame(width: 2 * k, height: 7 * k)
-                .offset(y: -18.5 * k)
+            Capsule().fill(Color.primary).frame(width: 2 * k, height: 6 * k)
+                .offset(y: -19.5 * k)
                 .rotationEffect(.degrees(elapsed * 360))
             Text(Formatting.percent(used)).font(.system(size: 10.5 * k, weight: .bold))
         }
@@ -63,13 +63,19 @@ struct StoplightDot: View {
     var light: Light
     var size: CGFloat = 9
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.renderStyle) private var renderStyle
 
     var body: some View {
         let color = Palette.color(for: light)
         Circle().fill(color).frame(width: size, height: size)
             .overlay {
                 if case .green(let pulse?) = light, !reduceMotion {
-                    PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: size, height: size)
+                    if renderStyle == .live {
+                        PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: size, height: size)
+                    } else {
+                        // Image rendering can't draw the Core Animation ring; show it mid-pulse.
+                        Circle().stroke(color.opacity(0.45), lineWidth: 2).scaleEffect(1.5)
+                    }
                 }
             }
             .accessibilityLabel(label)
