@@ -13,6 +13,8 @@ final class Settings: ObservableObject {
     @Published var notifySwitch: Bool { didSet { defaults.set(notifySwitch, forKey: "notifySwitch") } }
     @Published var notifyRed: Bool { didSet { defaults.set(notifyRed, forKey: "notifyRed") } }
     @Published var demoMode: Bool { didSet { defaults.set(demoMode, forKey: "demoMode") } }
+    /// Where the owner dragged the widget; nil means the bottom-right corner.
+    @Published var widgetOffset: WidgetOffset? { didSet { save(widgetOffset, "widgetOffset") } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -23,6 +25,7 @@ final class Settings: ObservableObject {
         notifySwitch = defaults.object(forKey: "notifySwitch") as? Bool ?? true
         notifyRed = defaults.object(forKey: "notifyRed") as? Bool ?? true
         demoMode = defaults.bool(forKey: "demoMode")
+        widgetOffset = Self.load(WidgetOffset.self, "widgetOffset", defaults)
     }
 
     /// The owner's picks, or by default every paid org (a free personal org has no billing type).

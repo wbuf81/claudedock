@@ -22,6 +22,15 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         #expect(DockFit.height(screen: screen, visible: leftDock, tileSize: 32) == 66)
     }
 
+    // The widget's contents track the Dock's icons (48 pt by default), not the bar, so a
+    // taller widget doesn't also grow wider and run under the Dock.
+    @Test func contentsScaleWithTheIconSize() {
+        #expect(DockFit.contentScale(tileSize: nil) == 1)
+        #expect(DockFit.contentScale(tileSize: 64) == 64.0 / 48)
+        #expect(DockFit.contentScale(tileSize: 16) == 0.75)
+        #expect(DockFit.contentScale(tileSize: 128) == 1.5)
+    }
+
     @Test func staysReadableAndSane() {
         #expect(DockFit.height(screen: screen, visible: screen, tileSize: 16) == 50)
         #expect(DockFit.height(screen: screen, visible: CGRect(x: 0, y: 400, width: 2560, height: 1040), tileSize: nil) == 140)

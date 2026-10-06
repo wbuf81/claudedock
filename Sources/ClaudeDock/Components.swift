@@ -7,20 +7,23 @@ struct WeekRing: View {
     var used: Double
     var elapsed: Double
     var color: Color
+    /// Outer size; the design is drawn at 48 pt.
+    var size: CGFloat = 48
 
     var body: some View {
+        let k = size / 48
         ZStack {
-            Circle().stroke(color.opacity(0.26), lineWidth: 6)
+            Circle().stroke(color.opacity(0.26), lineWidth: 6 * k)
             Circle().trim(from: 0, to: used / 100)
-                .stroke(color, lineWidth: 6)
+                .stroke(color, lineWidth: 6 * k)
                 .rotationEffect(.degrees(-90))
-            Capsule().fill(Color.primary).frame(width: 2, height: 7)
-                .offset(y: -18.5)
+            Capsule().fill(Color.primary).frame(width: 2 * k, height: 7 * k)
+                .offset(y: -18.5 * k)
                 .rotationEffect(.degrees(elapsed * 360))
-            Text(Formatting.percent(used)).font(.system(size: 10.5, weight: .bold))
+            Text(Formatting.percent(used)).font(.system(size: 10.5 * k, weight: .bold))
         }
-        .frame(width: 36, height: 36)
-        .frame(width: 48, height: 48)
+        .frame(width: 36 * k, height: 36 * k)
+        .frame(width: size, height: size)
     }
 }
 
@@ -39,7 +42,7 @@ struct UsageBar: View {
                 if !off {
                     Capsule().fill(color).frame(width: used > 0 ? max(geo.size.width * used / 100, height) : 0)
                     if let tick {
-                        Capsule().fill(Color.primary).frame(width: 2, height: height + 6)
+                        Capsule().fill(Color.primary).frame(width: 2, height: height * 2)
                             .offset(x: geo.size.width * tick - 1)
                     }
                 }
@@ -52,14 +55,15 @@ struct UsageBar: View {
 /// The stoplight dot. Green pulses (faster when more would go unused) unless Reduce Motion is on.
 struct StoplightDot: View {
     var light: Light
+    var size: CGFloat = 9
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let color = Palette.color(for: light)
-        Circle().fill(color).frame(width: 9, height: 9)
+        Circle().fill(color).frame(width: size, height: size)
             .overlay {
                 if case .green(let pulse?) = light, !reduceMotion {
-                    PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: 9, height: 9)
+                    PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: size, height: size)
                 }
             }
             .accessibilityLabel(label)
@@ -96,10 +100,14 @@ private struct PulseRing: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSView, context: Context) {
-        if let ring = view.layer?.sublayers?.first as? CAShapeLayer { configure(ring) }
+        if let ring = view.layer?.sublayers?.first as? CAShapeLayer { configure(ring, in: view) }
     }
 
-    private func configure(_ ring: CAShapeLayer) {
+    private func configure(_ ring: CAShapeLayer, in view: NSView? = nil) {
+        if let view, ring.frame != view.bounds {
+            ring.frame = view.bounds
+            ring.path = CGPath(ellipseIn: view.bounds.insetBy(dx: 1, dy: 1), transform: nil)
+        }
         ring.strokeColor = color.cgColor
         if ring.animation(forKey: "pulse")?.duration == period { return }
         let grow = CABasicAnimation(keyPath: "transform.scale")
@@ -126,6 +134,9 @@ struct WidgetActions {
     var settings: () -> Void = {}
     var signInOut: () -> Void = {}
     var quit: () -> Void = {}
+    var dragChanged: () -> Void = {}
+    var dragEnded: () -> Void = {}
+    var snapBack: () -> Void = {}
 
     static let none = WidgetActions()
 }

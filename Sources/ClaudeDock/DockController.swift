@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import ClaudeDockCore
 
 /// Owns the two floating windows: the always-on widget and the panel it opens.
 @MainActor
@@ -13,6 +14,7 @@ final class DockController {
     private var monitors: [Any] = []
     private var changes: AnyCancellable?
     private var hiddenUntil: Date?
+    private var dragStart: (mouse: NSPoint, origin: NSPoint)?
 
     init(model: AppModel, actions: WidgetActions) {
         self.model = model
@@ -67,24 +69,54 @@ final class DockController {
         monitors.removeAll()
     }
 
-    /// Bottom-right corner of the primary display (the one with the menu bar; `NSScreen.main`
-    /// follows keyboard focus between displays). With the Dock at the bottom, sit beside it
-    /// at the same height; otherwise stay inside the visible frame so a side Dock isn't covered.
+    /// Moves the widget with the mouse. Screen coordinates, so the window moving under the
+    /// pointer doesn't disturb the drag.
+    func dragChanged() {
+        let mouse = NSEvent.mouseLocation
+        if dragStart == nil {
+            dragStart = (mouse, widget.frame.origin)
+            closePanel()
+        }
+        guard let start = dragStart else { return }
+        widget.setFrameOrigin(NSPoint(x: start.origin.x + mouse.x - start.mouse.x, y: start.origin.y + mouse.y - start.mouse.y))
+    }
+
+    func dragEnded() {
+        dragStart = nil
+        guard let screen = NSScreen.screens.first else { return }
+        model.settings.widgetOffset = WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size, screen: screen.frame)
+        layout()
+    }
+
+    func snapBack() {
+        model.settings.widgetOffset = nil
+        layout()
+    }
+
+    /// Sizes the widget to the Dock bar and places it on the primary display (the one with the
+    /// menu bar; `NSScreen.main` follows keyboard focus between displays): where the owner
+    /// dragged it, or the bottom-right corner beside the Dock.
     private func layout() {
         guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
+        let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
+        let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize)
+        let scale = DockFit.contentScale(tileSize: tileSize)
+        if abs(model.widgetHeight - height) > 0.5 || abs(model.widgetScale - scale) > 0.001 {
+            model.widgetHeight = height  // these changes trigger another layout with the new size
+            model.widgetScale = scale
+            return
+        }
+        guard dragStart == nil else { return }
         let size = content.fittingSize
-        let full = screen.frame, visible = screen.visibleFrame
-        let dockAtBottom = visible.minY > full.minY + 1
-        let origin = NSPoint(x: visible.maxX - size.width - 12, y: dockAtBottom ? full.minY + 6 : visible.minY + 12)
+        let origin = WidgetPlacement.origin(size: size, screen: screen.frame, visible: screen.visibleFrame,
+                                            saved: model.settings.widgetOffset)
         widget.setFrame(NSRect(origin: origin, size: size), display: true)
         if panel.isVisible { placePanel() }
     }
 
     private func placePanel() {
         guard let content = panel.contentView, let screen = widget.screen ?? NSScreen.screens.first else { return }
-        let size = content.fittingSize
-        let bottom = widget.frame.maxY + 8
-        let height = min(size.height, screen.visibleFrame.maxY - bottom - 8)
-        panel.setFrame(NSRect(x: widget.frame.maxX - size.width, y: bottom, width: size.width, height: height), display: true)
+        panel.setFrame(WidgetPlacement.panelFrame(panel: content.fittingSize, widget: widget.frame,
+                                                  visible: screen.visibleFrame), display: true)
     }
 }

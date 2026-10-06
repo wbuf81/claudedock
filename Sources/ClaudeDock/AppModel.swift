@@ -12,6 +12,10 @@ final class AppModel: ObservableObject {
     @Published var signedIn = true
     @Published var lastError: String?
     @Published var now = Date()
+    /// The widget's contents are drawn for a 60 pt height and scaled by this to match the
+    /// Dock's icon size; the widget itself is `widgetHeight` tall, matching the Dock bar.
+    @Published var widgetScale: CGFloat = 1
+    @Published var widgetHeight: CGFloat = 60
 
     let settings: Settings
     let formatting = Formatting()

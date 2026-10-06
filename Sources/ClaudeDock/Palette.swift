@@ -38,27 +38,34 @@ extension EnvironmentValues {
     }
 }
 
-/// The rounded, translucent card both windows use.
+/// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
+/// Liquid Glass, the material the Dock is drawn with, so it follows the owner's Clear/Tinted
+/// and Reduce Transparency settings exactly as the Dock does. Otherwise a frosted material.
 struct HUDBackground: ViewModifier {
     @Environment(\.solidBackground) private var solid
     @Environment(\.colorScheme) private var scheme
     var radius: CGFloat
+    var glass: Bool
 
+    @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius)
-        content
-            .background {
-                if solid {
-                    shape.fill(scheme == .dark ? Color(white: 0.11) : Color(white: 0.97))
-                } else {
-                    shape.fill(.regularMaterial)
-                }
-            }
-            .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
-            .clipShape(shape)
+        if solid {
+            content
+                .background(shape.fill(scheme == .dark ? Color(white: 0.11) : Color(white: 0.97)))
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
+                .clipShape(shape)
+        } else if glass, #available(macOS 26.0, *) {
+            content.clipShape(shape).glassEffect(.regular, in: shape)
+        } else {
+            content
+                .background(shape.fill(.regularMaterial))
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
+                .clipShape(shape)
+        }
     }
 }
 
 extension View {
-    func hud(radius: CGFloat) -> some View { modifier(HUDBackground(radius: radius)) }
+    func hud(radius: CGFloat, glass: Bool = false) -> some View { modifier(HUDBackground(radius: radius, glass: glass)) }
 }
