@@ -7,7 +7,6 @@ import ClaudeDockCore
 @MainActor
 final class DockController {
     var onPanelOpened: (() -> Void)?
-    let dockWatcher = DockWatcher()
 
     private let model: AppModel
     // No window shadow: the Dock has none, and on glass it reads as a dark outline.
@@ -29,15 +28,6 @@ final class DockController {
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.layout() }
         }
-        dockWatcher.onChange = { [weak self] in self?.layout(animated: true) }
-        dockWatcher.start()
-    }
-
-    /// Asks for the Accessibility permission once, the first time the app runs without it.
-    func requestDockAccessOnce() {
-        guard !dockWatcher.isAllowed, !UserDefaults.standard.bool(forKey: "dockAccessAsked") else { return }
-        UserDefaults.standard.set(true, forKey: "dockAccessAsked")
-        dockWatcher.requestAccess()
     }
 
     func show() {
@@ -107,7 +97,7 @@ final class DockController {
     /// Sizes the widget to the Dock bar and places it on the primary display (the one with the
     /// menu bar; `NSScreen.main` follows keyboard focus between displays): where the owner
     /// dragged it, or the bottom-right corner beside the Dock.
-    private func layout(animated: Bool = false) {
+    private func layout() {
         guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
         let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize)
@@ -120,11 +110,9 @@ final class DockController {
         guard dragStart == nil else { return }
         let size = content.fittingSize
         let origin = WidgetPlacement.origin(size: size, screen: screen.frame, visible: screen.visibleFrame,
-                                            saved: model.settings.widgetOffset, dock: dockWatcher.frame)
+                                            saved: model.settings.widgetOffset)
         let frame = NSRect(origin: origin, size: size)
-        if frame != widget.frame {
-            widget.setFrame(frame, display: true, animate: animated && widget.isVisible)
-        }
+        if frame != widget.frame { widget.setFrame(frame, display: true) }
         if panel.isVisible { placePanel() }
     }
 

@@ -43,7 +43,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Ad-hoc signed, but with a designated requirement of just the bundle id, so macOS keeps the
-# Accessibility permission across rebuilds instead of tying it to each build's hash.
+# Ad-hoc signed, but with a designated requirement of just the bundle id, so macOS keeps
+# privacy permissions (like notifications) across rebuilds instead of tying them to each
+# build's hash.
 codesign --force --sign - --requirements '=designated => identifier "com.wbuf81.claudedock"' "$APP"
 echo "Built $APP"

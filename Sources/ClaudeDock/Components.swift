@@ -37,14 +37,22 @@ struct UsageBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(color.opacity(0.26))
-                Capsule().fill(color).frame(width: used > 0 ? max(geo.size.width * used / 100, height) : 0)
-                if let tick {
-                    Capsule().fill(Color.primary).frame(width: 2, height: height * 2)
-                        .offset(x: geo.size.width * tick - 1)
+            let width = geo.size.width
+            // The track sets the size; the fill and the (taller) tick are overlays, so they can
+            // never make one bar taller than another.
+            Capsule().fill(color.opacity(0.26))
+                .frame(width: width, height: height)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(color)
+                        .frame(width: used > 0 ? max(width * used / 100, height) : 0, height: height)
                 }
-            }
+                .overlay(alignment: .leading) {
+                    if let tick {
+                        Capsule().fill(Color.primary)
+                            .frame(width: 2, height: height * 2)
+                            .offset(x: width * tick - 1)
+                    }
+                }
         }
         .frame(height: height)
     }

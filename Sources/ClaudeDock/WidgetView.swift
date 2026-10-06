@@ -28,7 +28,7 @@ struct WidgetView: View {
                     .padding(.horizontal, 16 * k)
             }
             ForEach(Array(model.orgs.enumerated()), id: \.element.id) { index, org in
-                if index > 0 { Divider() }
+                if index > 0 { Divider().padding(.vertical, 16 * k) }
                 OrgBlock(model: model, org: org, k: k)
             }
         }
@@ -62,10 +62,10 @@ private struct OrgBlock: View {
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow
         let red = light == .red
-        HStack(spacing: 12 * k) {
+        HStack(spacing: 14 * k) {
             WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
                      color: red ? Palette.crit : Palette.accent, size: 48 * k)
-            VStack(alignment: .leading, spacing: 5 * k) {
+            VStack(alignment: .leading, spacing: 6 * k) {
                 HStack(spacing: 6 * k) {
                     Text(org.name).font(.system(size: 13 * k, weight: .semibold)).lineLimit(1)
                     StoplightDot(light: light, size: 9 * k)
@@ -80,8 +80,7 @@ private struct OrgBlock: View {
             }
             .frame(width: 150 * k, alignment: .leading)
         }
-        .padding(.leading, 14 * k)
-        .padding(.trailing, 16 * k)
+        .padding(.horizontal, 18 * k)
         .frame(maxHeight: .infinity)
     }
 }
