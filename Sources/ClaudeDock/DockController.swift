@@ -135,7 +135,7 @@ final class DockController {
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
         let ownerScale = settings.sizeScale * pinchFactor
         let height = DockFit.height(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
-        let scale = DockFit.contentScale(tileSize: tileSize) * ownerScale
+        let scale = DockFit.contentScale(screen: screen.frame, visible: screen.visibleFrame, tileSize: tileSize) * ownerScale
         let vertical = WidgetLayout.isVertical(spot: settings.widgetSpot, choice: settings.layoutChoice)
         if abs(model.widgetHeight - height) > 0.5 || abs(model.widgetScale - scale) > 0.001 || model.vertical != vertical {
             model.widgetHeight = height  // these changes trigger another layout with the new size

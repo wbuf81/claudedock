@@ -20,8 +20,14 @@ public enum DockFit {
     /// How much to scale the widget's contents: with the Dock's icons (48 pt by default), so
     /// the rings sit in the widget the way the icons sit in the Dock, and a taller widget
     /// doesn't also grow wider and run under the Dock. Kept between 0.75 and 1.5.
-    public static func contentScale(tileSize: Double?) -> Double {
-        min(max((tileSize ?? defaultTileSize) / defaultTileSize, 0.75), 1.5)
+    ///
+    /// The icons are measured from the bar macOS actually reserves, like `height`: the icon
+    /// size setting can say 64 while macOS shrinks a full Dock's icons to fit the screen.
+    /// The setting is only used when the Dock auto-hides or sits on a side.
+    public static func contentScale(screen: CGRect, visible: CGRect, tileSize: Double?) -> Double {
+        let reserved = visible.minY - screen.minY
+        let icons = reserved > 20 ? reserved - reservedOverBar - barOverIcons : (tileSize ?? defaultTileSize)
+        return min(max(icons / defaultTileSize, 0.75), 1.5)
     }
 
 }

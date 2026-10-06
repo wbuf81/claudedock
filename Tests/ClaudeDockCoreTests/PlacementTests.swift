@@ -22,13 +22,21 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         #expect(DockFit.height(screen: screen, visible: leftDock, tileSize: 32) == 66)
     }
 
-    // The widget's contents track the Dock's icons (48 pt by default), not the bar, so a
-    // taller widget doesn't also grow wider and run under the Dock.
-    @Test func contentsScaleWithTheIconSize() {
-        #expect(DockFit.contentScale(tileSize: nil) == 1)
-        #expect(DockFit.contentScale(tileSize: 64) == 64.0 / 48)
-        #expect(DockFit.contentScale(tileSize: 16) == 0.75)
-        #expect(DockFit.contentScale(tileSize: 128) == 1.5)
+    // The widget's contents track the Dock's icons, not the bar, so a taller widget doesn't
+    // also grow wider and run under the Dock. The icons are measured from the bar macOS
+    // actually reserves: the size setting can say 64 while macOS shrinks a full Dock to fit
+    // the screen.
+    @Test func contentsScaleWithTheIconsTheDockActuallyDraws() {
+        #expect(DockFit.contentScale(screen: screen, visible: visibleWithDock, tileSize: 64) == 1)
+        let biggerDock = CGRect(x: 0, y: 106, width: 2560, height: 1334)
+        #expect(DockFit.contentScale(screen: screen, visible: biggerDock, tileSize: 48) == 64.0 / 48)
+    }
+
+    @Test func hiddenOrSideDockFallsBackToTheIconSetting() {
+        #expect(DockFit.contentScale(screen: screen, visible: screen, tileSize: nil) == 1)
+        #expect(DockFit.contentScale(screen: screen, visible: screen, tileSize: 64) == 64.0 / 48)
+        #expect(DockFit.contentScale(screen: screen, visible: screen, tileSize: 16) == 0.75)
+        #expect(DockFit.contentScale(screen: screen, visible: screen, tileSize: 128) == 1.5)
     }
 
     @Test func staysReadableAndSane() {
