@@ -66,9 +66,35 @@ final class Poller {
             failures = 0
         } catch WebSessionError.signedOut {
             model.signedIn = false
+        } catch WebSessionError.forbidden {
+            // A JSON 403 can mean the session is gone or only that one org refused; the org
+            // list tells which.
+            if await sessionIsGone() {
+                model.signedIn = false
+            } else {
+                failures += 1
+                model.lastError = "an org refused access"
+            }
         } catch {
             failures += 1
             model.lastError = String(describing: error)
+        }
+    }
+
+    /// After a sign-in the account may be different: re-read the org list, then poll.
+    func restartAfterSignIn() {
+        orgsFetchedAt = nil
+        start()
+    }
+
+    private func sessionIsGone() async -> Bool {
+        do {
+            _ = try await session.getJSON("/api/organizations")
+            return false
+        } catch WebSessionError.signedOut, WebSessionError.forbidden {
+            return true
+        } catch {
+            return false
         }
     }
 

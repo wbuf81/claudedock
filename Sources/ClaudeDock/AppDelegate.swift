@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { await self.poller.refresh() }
             }
         }
-        session.onSignedIn = { [weak self] in self?.poller.start() }
+        session.onSignedIn = { [weak self] in self?.poller.restartAfterSignIn() }
         notifier.onClick = { [weak self] in self?.dock.openPanel() }
         notifier.requestPermission()
         model.onAdvice = { [weak self] advice in

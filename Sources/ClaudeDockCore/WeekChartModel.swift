@@ -29,6 +29,10 @@ public struct WeekChartModel: Equatable, Sendable {
     /// The next window at use-it-all pace, from the reset to Sunday night.
     public var nextWindow: [ChartPoint]
     public var days: [DayMark]
+    /// The "↺ reset" label would overlap the TODAY label, so the two share one label.
+    public var resetLabelMeetsToday = false
+    /// Near the right edge the "now" label would run off the chart, so put it left of the dot.
+    public var nowLabelOnLeft = false
 
     public static func make(axis: WeekAxis, now: Date, reading: Reading, forecast: WeekForecast?,
                             history: [Reading]) -> WeekChartModel {
@@ -46,6 +50,7 @@ public struct WeekChartModel: Equatable, Sendable {
         var model = WeekChartModel(today: axis.today(now), nowX: axis.x(now), nowY: reading.week / 100,
                                    past: clip(past, axis), useItAll: [], yourPace: [], unused: [],
                                    resetX: nil, nextWindow: [], days: axis.days)
+        model.nowLabelOnLeft = model.nowX > 0.8
         guard let reset = reading.weekResetsAt, let forecast else { return model }
 
         let allLine = [(now, reading.week), (reset, 100.0)]
@@ -65,6 +70,8 @@ public struct WeekChartModel: Equatable, Sendable {
         }
         if axis.contains(reset) {
             model.resetX = axis.x(reset)
+            let todayCenter = (model.today.lowerBound + model.today.upperBound) / 2
+            model.resetLabelMeetsToday = abs(axis.x(reset) - todayCenter) < 0.15
             let nextAtEnd = axis.end.timeIntervalSince(reset) / Pace.window * 100
             model.nextWindow = [point((reset, 0), axis), point((axis.end, nextAtEnd), axis)]
         }

@@ -68,6 +68,14 @@ let orgsJSON = """
         #expect(r.weekResetsAt == nil)
     }
 
+    // Final review #6: a reset time we can't read is an error, not "hasn't started".
+    @Test func unreadableResetTimeIsAnError() {
+        let json = #"{"limits": [{"kind": "weekly_all", "percent": 55, "resets_at": "next friday"}]}"#
+        #expect(throws: UsageParserError.unreadableResetTime) {
+            try UsageParser.reading(from: Data(json.utf8), org: "pikachu", at: designNow)
+        }
+    }
+
     @Test func fallsBackToOlderShape() throws {
         let json = """
         {"five_hour": {"utilization": 12, "resets_at": "2026-10-06T15:20:00+00:00"},

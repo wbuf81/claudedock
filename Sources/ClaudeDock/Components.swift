@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ClaudeDockCore
 
@@ -49,8 +50,6 @@ struct UsageBar: View {
 }
 
 /// The stoplight dot. Green pulses (faster when more would go unused) unless Reduce Motion is on.
-/// The pulse is drawn from the clock rather than a `@State` animation: with the macOS 27 SDK
-/// `@State` is a macro whose plugin the Command Line Tools don't ship.
 struct StoplightDot: View {
     var light: Light
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -60,13 +59,7 @@ struct StoplightDot: View {
         Circle().fill(color).frame(width: 9, height: 9)
             .overlay {
                 if case .green(let pulse?) = light, !reduceMotion {
-                    TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                        let seconds = context.date.timeIntervalSinceReferenceDate
-                        let phase = seconds.truncatingRemainder(dividingBy: pulse.rawValue) / pulse.rawValue
-                        Circle().stroke(color, lineWidth: 2)
-                            .scaleEffect(1 + 1.4 * phase)
-                            .opacity(0.8 * (1 - phase))
-                    }
+                    PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: 9, height: 9)
                 }
             }
             .accessibilityLabel(label)
@@ -78,6 +71,50 @@ struct StoplightDot: View {
         case .yellow: "On pace"
         case .red: "Nearly out"
         }
+    }
+}
+
+/// The pulsing ring around a green dot, animated by Core Animation in the window server so
+/// the app does no per-frame work. (A SwiftUI animation here re-laid out the whole widget on
+/// every frame, about 5% CPU all day; `@State` animations also can't compile with the macOS 27
+/// SDK on the Command Line Tools.) `--render` shows the dot without the ring.
+private struct PulseRing: NSViewRepresentable {
+    var color: NSColor
+    var period: Double
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 9, height: 9))
+        view.wantsLayer = true
+        let ring = CAShapeLayer()
+        ring.frame = view.bounds
+        ring.path = CGPath(ellipseIn: view.bounds.insetBy(dx: 1, dy: 1), transform: nil)
+        ring.fillColor = nil
+        ring.lineWidth = 2
+        view.layer?.addSublayer(ring)
+        configure(ring)
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        if let ring = view.layer?.sublayers?.first as? CAShapeLayer { configure(ring) }
+    }
+
+    private func configure(_ ring: CAShapeLayer) {
+        ring.strokeColor = color.cgColor
+        if ring.animation(forKey: "pulse")?.duration == period { return }
+        let grow = CABasicAnimation(keyPath: "transform.scale")
+        grow.fromValue = 1
+        grow.toValue = 2.4
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.8
+        fade.toValue = 0
+        let pulse = CAAnimationGroup()
+        pulse.animations = [grow, fade]
+        pulse.duration = period
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        pulse.repeatCount = .infinity
+        pulse.isRemovedOnCompletion = false
+        ring.add(pulse, forKey: "pulse")
     }
 }
 

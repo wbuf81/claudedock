@@ -52,6 +52,25 @@ import Testing
         #expect(c.unused[1].x == 1 && c.unused[2].x == 1)
     }
 
+    // Final review #15: labels that would collide move out of each other's way.
+    @Test func resetLabelJoinsTodayWhenTheyMeet() {
+        let wednesday = local(2026, 10, 7, 10)
+        let r = reading(org: "charizard", week: 95, weekResetsAt: local(2026, 10, 7, 21), at: wednesday)
+        let onWednesday = WeekChartModel.make(axis: axis, now: wednesday, reading: r,
+                                              forecast: Pace.forecast(r, history: [], now: wednesday, calendar: newYork), history: [])
+        #expect(onWednesday.resetLabelMeetsToday)
+        #expect(!chart(reading(org: "charizard", week: 95, weekResetsAt: local(2026, 10, 7, 21))).resetLabelMeetsToday)
+    }
+
+    @Test func nowLabelFlipsLeftNearTheEnd() {
+        let sunday = local(2026, 10, 11, 20)
+        let r = reading(week: 40, weekResetsAt: local(2026, 10, 13, 4), at: sunday)
+        let late = WeekChartModel.make(axis: axis, now: sunday, reading: r,
+                                       forecast: Pace.forecast(r, history: [], now: sunday, calendar: newYork), history: [])
+        #expect(late.nowLabelOnLeft)
+        #expect(!chart(reading(week: 55, weekResetsAt: local(2026, 10, 9, 4))).nowLabelOnLeft)
+    }
+
     // Review Focus 1
     @Test func weekNotStartedHasOnlyNow() {
         let c = chart(reading(week: 0, weekResetsAt: nil))

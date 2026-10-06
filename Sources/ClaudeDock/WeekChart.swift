@@ -27,7 +27,8 @@ struct WeekChart: View {
             let todayX = plot.minX + chart.today.lowerBound * plot.width
             let todayWidth = (chart.today.upperBound - chart.today.lowerBound) * plot.width
             ctx.fill(Path(CGRect(x: todayX, y: plot.minY, width: todayWidth, height: plot.height)), with: .color(.primary.opacity(0.08)))
-            ctx.draw(Text("TODAY").font(.system(size: 8.5, weight: .bold)).foregroundColor(.primary),
+            let todayLabel = chart.resetLabelMeetsToday && resetLabel != nil ? "TODAY · ↺ \(resetLabel!)" : "TODAY"
+            ctx.draw(Text(todayLabel).font(.system(size: 8.5, weight: .bold)).foregroundColor(.primary),
                      at: CGPoint(x: todayX + todayWidth / 2, y: 5))
 
             for day in chart.days.dropFirst() { ctx.stroke(vertical(day.start), with: .color(.primary.opacity(0.08)), lineWidth: 1) }
@@ -46,7 +47,7 @@ struct WeekChart: View {
             if let resetX = chart.resetX {
                 ctx.stroke(vertical(resetX), with: .color(Palette.accent), lineWidth: 1.5)
                 ctx.stroke(path(chart.nextWindow), with: .color(.secondary.opacity(0.35)), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                if let resetLabel {
+                if let resetLabel, !chart.resetLabelMeetsToday {
                     ctx.draw(Text("↺ \(resetLabel)").font(.system(size: 8.5)).foregroundColor(.secondary),
                              at: CGPoint(x: plot.minX + resetX * plot.width, y: 5))
                 }
@@ -57,7 +58,8 @@ struct WeekChart: View {
             ctx.fill(Path(ellipseIn: CGRect(x: dot.x - 4, y: dot.y - 4, width: 8, height: 8)), with: .color(lineColor))
             let labelY = dot.y + 14 < plot.maxY ? dot.y + 12 : dot.y - 10
             ctx.draw(Text("now · \(Formatting.percent(chart.nowY * 100))").font(.system(size: 9.5, weight: .semibold)).foregroundColor(.primary),
-                     at: CGPoint(x: dot.x + 6, y: labelY), anchor: .leading)
+                     at: CGPoint(x: chart.nowLabelOnLeft ? dot.x - 6 : dot.x + 6, y: labelY),
+                     anchor: chart.nowLabelOnLeft ? .trailing : .leading)
 
             for day in chart.days {
                 let isToday = chart.today.contains(day.center)

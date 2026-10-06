@@ -67,10 +67,11 @@ final class DockController {
         monitors.removeAll()
     }
 
-    /// Bottom-right corner. With the Dock at the bottom, sit beside it at the same height;
-    /// otherwise stay inside the visible frame so a side Dock isn't covered.
+    /// Bottom-right corner of the primary display (the one with the menu bar; `NSScreen.main`
+    /// follows keyboard focus between displays). With the Dock at the bottom, sit beside it
+    /// at the same height; otherwise stay inside the visible frame so a side Dock isn't covered.
     private func layout() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first, let content = widget.contentView else { return }
+        guard let screen = NSScreen.screens.first, let content = widget.contentView else { return }
         let size = content.fittingSize
         let full = screen.frame, visible = screen.visibleFrame
         let dockAtBottom = visible.minY > full.minY + 1
@@ -80,7 +81,7 @@ final class DockController {
     }
 
     private func placePanel() {
-        guard let content = panel.contentView, let screen = widget.screen ?? NSScreen.main else { return }
+        guard let content = panel.contentView, let screen = widget.screen ?? NSScreen.screens.first else { return }
         let size = content.fittingSize
         let bottom = widget.frame.maxY + 8
         let height = min(size.height, screen.visibleFrame.maxY - bottom - 8)

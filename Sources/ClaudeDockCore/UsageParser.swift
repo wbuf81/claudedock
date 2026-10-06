@@ -3,6 +3,7 @@ import Foundation
 public enum UsageParserError: Error, Equatable {
     case notJSON
     case noWeeklyLimit
+    case unreadableResetTime
 }
 
 /// Turns claude.ai's JSON into models. Tolerant: unknown fields are ignored, and the
@@ -30,15 +31,15 @@ public enum UsageParser {
 
         if let fiveHour = root["five_hour"] as? [String: Any] {
             session = number(fiveHour["utilization"]) ?? 0
-            sessionResetsAt = date(fiveHour["resets_at"])
+            sessionResetsAt = try resetTime(fiveHour["resets_at"])
         }
         if let sevenDay = root["seven_day"] as? [String: Any] {
             week = number(sevenDay["utilization"])
-            weekResetsAt = date(sevenDay["resets_at"])
+            weekResetsAt = try resetTime(sevenDay["resets_at"])
         }
         for limit in root["limits"] as? [[String: Any]] ?? [] {
             let percent = number(limit["percent"])
-            let reset = date(limit["resets_at"])
+            let reset = try resetTime(limit["resets_at"])
             switch limit["kind"] as? String {
             case "session":
                 session = percent ?? 0
@@ -76,6 +77,12 @@ public enum UsageParser {
     }
 
     private static func number(_ value: Any?) -> Double? { (value as? NSNumber)?.doubleValue }
-    private static func date(_ value: Any?) -> Date? { (value as? String).flatMap(parseDate) }
+    /// nil when claude.ai sends null (no window open); an error when it sends a time we
+    /// can't read, so a format change shows as stale rather than as "hasn't started".
+    private static func resetTime(_ value: Any?) throws -> Date? {
+        guard let text = value as? String else { return nil }
+        guard let date = parseDate(text) else { throw UsageParserError.unreadableResetTime }
+        return date
+    }
     private static func clamp(_ value: Double) -> Double { min(max(value, 0), 100) }
 }
