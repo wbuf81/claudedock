@@ -11,7 +11,7 @@ import ClaudeDockCore
 /// site scripts run all day. If the site's bot check blocks requests from it, the full
 /// usage page (which can pass the check) is used instead until the app restarts.
 @MainActor
-final class ClaudeWebSession: NSObject, WKNavigationDelegate {
+final class ClaudeWebSession: NSObject, WKNavigationDelegate, WKUIDelegate {
     var onSignedIn: (() -> Void)?
 
     private static let lightHome = URL(string: "https://claude.ai/robots.txt")!
@@ -25,6 +25,8 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var signInWindow: NSWindow?
     private var signInView: WKWebView?
+    /// Windows the sign-in page opened (Google and single sign-on use pop-ups).
+    private var popups: [NSWindow] = []
 
     /// GETs a claude.ai API path and returns the response body.
     func getJSON(_ path: String) async throws -> Data {
@@ -68,16 +70,21 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let size = NSSize(width: 520, height: 720)
+        let size = NSSize(width: 520, height: 760)
         let container = NSView(frame: NSRect(origin: .zero, size: size))
-        let hint = NSTextField(wrappingLabelWithString: "Sign in to claude.ai once. Claude Dock only reads your usage. If Google sign-in is blocked here, use “Continue with email”.")
+        let hint = NSTextField(wrappingLabelWithString: "Sign in to claude.ai once. Claude Dock only reads your usage. If Google sign-in is blocked here, use “Continue with email”. An emailed sign-in link opens in your browser: copy the link instead, then click the button below.")
         hint.font = .systemFont(ofSize: 12)
-        hint.frame = NSRect(x: 12, y: size.height - 46, width: size.width - 24, height: 38)
+        hint.frame = NSRect(x: 12, y: size.height - 62, width: size.width - 24, height: 54)
         hint.autoresizingMask = [.width, .minYMargin]
+        let paste = NSButton(title: "Open copied sign-in link", target: self, action: #selector(openCopiedLink))
+        paste.frame = NSRect(x: 8, y: size.height - 94, width: 210, height: 28)
+        paste.autoresizingMask = [.minYMargin]
         let view = makeWebView()
-        view.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height - 52)
+        view.uiDelegate = self
+        view.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height - 100)
         view.autoresizingMask = [.width, .height]
         container.addSubview(hint)
+        container.addSubview(paste)
         container.addSubview(view)
         view.load(URLRequest(url: Self.login))
 
@@ -94,12 +101,50 @@ final class ClaudeWebSession: NSObject, WKNavigationDelegate {
         watchForSignIn()
     }
 
-    /// Deletes this app's claude.ai cookies and storage.
+    /// Deletes every cookie and stored item in this app's web store: claude.ai's, and those
+    /// of any Google or single sign-on page used to sign in.
     func signOut() async {
         let types = WKWebsiteDataStore.allWebsiteDataTypes()
         let records = await dataStore.dataRecords(ofTypes: types)
-        await dataStore.removeData(ofTypes: types, for: records.filter { $0.displayName.contains("claude.ai") })
+        await dataStore.removeData(ofTypes: types, for: records)
         page.invalidate()
+    }
+
+    /// Loads a claude.ai link from the clipboard (a sign-in link from an email) in the
+    /// sign-in window. Anything else is refused.
+    @objc private func openCopiedLink() {
+        let text = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard let url = URL(string: text), url.scheme == "https",
+              let host = url.host, host == "claude.ai" || host.hasSuffix(".claude.ai") else {
+            NSSound.beep()
+            return
+        }
+        signInView?.load(URLRequest(url: url))
+    }
+
+    // MARK: Pop-ups
+
+    /// Google and single sign-on open their sign-in in a pop-up that talks back to the page
+    /// that opened it, so it gets a real window sharing this session.
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let size = NSSize(width: windowFeatures.width?.doubleValue ?? 500, height: windowFeatures.height?.doubleValue ?? 640)
+        let popup = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: configuration)
+        popup.uiDelegate = self
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.title = "Sign in"
+        window.contentView = popup
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        popups.append(window)
+        return popup
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        popups.filter { $0.contentView === webView }.forEach { $0.close() }
+        popups.removeAll { $0.contentView === webView }
     }
 
     // MARK: Private

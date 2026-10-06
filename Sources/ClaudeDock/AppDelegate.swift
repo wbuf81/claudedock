@@ -39,8 +39,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         session.onSignedIn = { [weak self] in self?.poller.restartAfterSignIn() }
-        notifier.onClick = { [weak self] in self?.dock.openPanel() }
-        notifier.requestPermission()
+        notifier.onClick = { [weak self] in
+            guard let self else { return }
+            if self.model.signedIn { self.dock.openPanel() } else { self.session.showSignIn() }
+        }
+        notifier.start()
+        model.onSignedOut = { [weak self] in
+            self?.notifier.post("Claude Dock was signed out", "claude.ai ended the session. Click to sign in again.")
+        }
         model.onAdvice = { [weak self] advice in
             guard let self, self.model.settings.notifySwitch else { return }
             self.notifier.post("Move Claude Code to \(advice.target.name)", advice.reason)
@@ -133,9 +139,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// The spec has Claude Dock launch at login; register once, then leave it to Settings.
+    /// Claude Dock launches at login once it's installed: the first launch from an
+    /// Applications folder registers it, then Settings has the switch. A copy run from the
+    /// build folder doesn't, so a login item never points at a build that may be deleted.
     private func registerLoginItemOnce() {
-        guard Bundle.main.bundleIdentifier != nil, !UserDefaults.standard.bool(forKey: "loginItemOffered") else { return }
+        let path = Bundle.main.bundleURL.path
+        let installed = path.hasPrefix("/Applications/") || path.hasPrefix(NSHomeDirectory() + "/Applications/")
+        guard Bundle.main.bundleIdentifier != nil, installed,
+              !UserDefaults.standard.bool(forKey: "loginItemOffered") else { return }
         UserDefaults.standard.set(true, forKey: "loginItemOffered")
         try? SMAppService.mainApp.register()
     }

@@ -5,6 +5,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="build/Claude Dock.app"
+# A copy running from this folder would lose its files mid-run: quit it, and reopen it after.
+running="$PWD/$APP/Contents/MacOS/ClaudeDock"
+reopen=0
+if pgrep -f "$running" >/dev/null; then
+  pkill -f "$running" || true
+  reopen=1
+fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 
@@ -48,3 +55,7 @@ PLIST
 # build's hash.
 codesign --force --sign - --requirements '=designated => identifier "com.wbuf81.claudedock"' "$APP"
 echo "Built $APP"
+if [ "$reopen" = 1 ]; then
+  open "$APP"
+  echo "Reopened the running copy"
+fi
