@@ -13,6 +13,7 @@
   <img src="https://img.shields.io/badge/SwiftUI-Liquid%20Glass-0A84FF" alt="SwiftUI, Liquid Glass">
   <img src="https://img.shields.io/badge/tests-Swift%20Testing-34C759" alt="Tested with Swift Testing">
   <img src="https://img.shields.io/badge/dependencies-none-lightgrey" alt="No dependencies">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
 <p align="center">
@@ -174,6 +175,10 @@ hooks use it when present. To audit everything already tracked:
 ```
 
 Examples in this repository use Pokémon names for organizations, never real ones.
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
