@@ -35,9 +35,10 @@ final class Settings: ObservableObject {
         sizeScale = WidgetLayout.clampSize(defaults.object(forKey: "sizeScale") as? Double ?? 1)
     }
 
-    /// The owner's picks, or by default every paid org (a free personal org has no billing type).
+    /// Whether an org is shown: the owner's picks, or by default every paid org (or every org,
+    /// for an account with none).
     func isShown(_ org: Org) -> Bool {
-        shownOrgs.map { $0.contains(org.id) } ?? (org.billingType != nil)
+        OrgFilter.shown(knownOrgs, chosen: shownOrgs).contains { $0.id == org.id }
     }
 
     private func save<T: Encodable>(_ value: T, _ key: String) {

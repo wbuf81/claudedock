@@ -64,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         registerLoginItemOnce()
         dock.show()
+        // For checking the panel without a click: CLAUDEDOCK_OPEN_PANEL=1.
+        if ProcessInfo.processInfo.environment["CLAUDEDOCK_OPEN_PANEL"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.dock.openPanel() }
+        }
         if settings.demoMode {
             startDemo()
         } else {

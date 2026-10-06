@@ -12,6 +12,7 @@ final class DockController {
     // No window shadow: the Dock has none, and on glass it reads as a dark outline.
     private let widget = FloatingPanel(allowsKey: false, shadow: false)
     private let panel = FloatingPanel(allowsKey: true)
+    private let panelContent: NSHostingView<PanelView>
     private var monitors: [Any] = []
     private var changes: AnyCancellable?
     private var hiddenUntil: Date?
@@ -24,7 +25,16 @@ final class DockController {
     init(model: AppModel, actions: WidgetActions) {
         self.model = model
         widget.contentView = NSHostingView(rootView: WidgetView(model: model, actions: actions))
-        panel.contentView = NSHostingView(rootView: PanelView(model: model, actions: actions))
+        // The panel scrolls when the screen is too short for it (a 13-inch laptop, three orgs).
+        panelContent = NSHostingView(rootView: PanelView(model: model, actions: actions))
+        let scroll = NSScrollView()
+        scroll.documentView = panelContent
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.contentView.drawsBackground = false
+        scroll.borderType = .noBorder
+        panel.contentView = scroll
         changes = model.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.layout() } }
         }
@@ -58,6 +68,7 @@ final class DockController {
     func openPanel() {
         guard !panel.isVisible else { return }
         placePanel()
+        panelContent.scroll(.zero)
         panel.orderFrontRegardless()
         panel.makeKey()
         onPanelOpened?()
@@ -160,8 +171,10 @@ final class DockController {
     }
 
     private func placePanel() {
-        guard let content = panel.contentView, let screen = widget.screen ?? NSScreen.screens.first else { return }
-        panel.setFrame(WidgetPlacement.panelFrame(panel: content.fittingSize, widget: widget.frame,
-                                                  visible: screen.visibleFrame), display: true)
+        guard let screen = widget.screen ?? NSScreen.screens.first else { return }
+        let size = panelContent.fittingSize
+        if panelContent.frame.size != size { panelContent.frame = NSRect(origin: .zero, size: size) }
+        panel.setFrame(WidgetPlacement.panelFrame(panel: size, widget: widget.frame, visible: screen.visibleFrame),
+                       display: true)
     }
 }

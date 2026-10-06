@@ -66,7 +66,7 @@ final class AppModel: ObservableObject {
     /// the org Claude Code is signed into becomes the primary org.
     func setAvailableOrgs(_ all: [Org], claudeCodeOrg: String?) {
         settings.knownOrgs = all
-        let shown = all.filter { settings.isShown($0) }
+        let shown = OrgFilter.shown(all, chosen: settings.shownOrgs)
         if !shown.contains(where: { $0.id == settings.primaryOrg }) {
             settings.primaryOrg = shown.first(where: { $0.id == claudeCodeOrg })?.id ?? shown.first?.id
         }
