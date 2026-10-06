@@ -120,7 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let view = SettingsView(model: model, settings: model.settings,
                                     setDemoMode: { [weak self] in self?.setDemoMode($0) },
-                                    signInOut: { [weak self] in self?.signInOrOut() })
+                                    signInOut: { [weak self] in self?.signInOrOut() },
+                                    refresh: { [weak self] in Task { await self?.poller.refresh() } })
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Claude Dock Settings"
             window.styleMask = [.titled, .closable]

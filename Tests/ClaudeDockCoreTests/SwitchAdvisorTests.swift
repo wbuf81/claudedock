@@ -32,6 +32,19 @@ func advise(_ orgs: [OrgStatus], cc: String? = "pikachu") -> Advice? {
                 == "Claude Code is on Pikachu, the right place right now.")
     }
 
+    // With one org there's nothing to switch between, so no line about switching.
+    @Test func oneOrgNeedsNoStatusLine() {
+        let one = [status(pikachu, .primary, week: 95, reset: friday4am)]
+        #expect(SwitchAdvisor.statusLine(one, claudeCodeOrg: "pikachu", advice: nil, now: designNow, formatting: fmt, Thresholds()) == "")
+    }
+
+    @Test func claudeCodeOnAHiddenOrgIsExplained() {
+        let mew = Org(id: "mew", name: "Mew")
+        #expect(SwitchAdvisor.statusLine(today, claudeCodeOrg: "mew", advice: nil, now: designNow, formatting: fmt, Thresholds(),
+                                         hidden: [mew])
+                == "Claude Code is on Mew, which isn't shown here. Turn it on in Settings to follow it.")
+    }
+
     @Test func busyPrimarySessionMovesToOverflow() {
         let orgs = [
             status(pikachu, .primary, week: 60, reset: friday4am, session: 85, sessionReset: designNow.addingTimeInterval(1.5 * 3600)),

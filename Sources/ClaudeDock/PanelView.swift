@@ -82,13 +82,16 @@ private struct OrgSection: View {
             HStack(spacing: 6) {
                 Text(org.name).font(.system(size: 13, weight: .bold)).lineLimit(1)
                 StoplightDot(light: light)
-                Text(model.role(of: org) == .primary ? "Desktop app + Claude Code" : "Extra Claude Code")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
-                    .fixedSize()
+                // Roles only mean something with two orgs to split work between.
+                if model.orgs.count > 1 {
+                    Text(model.role(of: org) == .primary ? "Desktop app + Claude Code" : "Extra Claude Code")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                        .fixedSize()
+                }
                 Spacer(minLength: 4)
                 if model.claudeCodeOrg == org.id {
                     HStack(spacing: 4) {

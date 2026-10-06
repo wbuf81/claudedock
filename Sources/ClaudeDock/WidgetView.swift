@@ -67,8 +67,11 @@ struct WidgetView: View {
         VStack(spacing: 1 * k) {
             Text("⇄").font(.system(size: 14 * k)).foregroundStyle(Palette.warn)
             Text("\(advice.target.name)\nfirst")
-                .font(.system(size: 9.5 * k, weight: .semibold))
+                .font(.system(size: max(9.5 * k, 9), weight: .semibold))
                 .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: 64 * k)
         }
     }
 

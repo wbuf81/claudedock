@@ -66,14 +66,15 @@ final class AppModel: ObservableObject {
 
     var statusLine: String {
         SwitchAdvisor.statusLine(statuses, claudeCodeOrg: claudeCodeOrg, advice: advice, now: now,
-                                 formatting: formatting, settings.thresholds)
+                                 formatting: formatting, settings.thresholds,
+                                 hidden: settings.knownOrgs.filter { org in !orgs.contains { $0.id == org.id } })
     }
 
     /// The org list from claude.ai: show the selected orgs, primary first. The first time,
     /// the org Claude Code is signed into becomes the primary org.
     func setAvailableOrgs(_ all: [Org], claudeCodeOrg: String?) {
         settings.knownOrgs = all
-        let shown = OrgFilter.shown(all, chosen: settings.shownOrgs)
+        let shown = OrgFilter.shown(all, choices: settings.orgChoices)
         if !shown.contains(where: { $0.id == settings.primaryOrg }) {
             settings.primaryOrg = shown.first(where: { $0.id == claudeCodeOrg })?.id ?? shown.first?.id
         }

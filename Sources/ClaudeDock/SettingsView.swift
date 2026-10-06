@@ -7,6 +7,8 @@ struct SettingsView: View {
     @ObservedObject var settings: Settings
     var setDemoMode: (Bool) -> Void
     var signInOut: () -> Void
+    /// Reads claude.ai now, so an org just turned on doesn't wait for the next refresh.
+    var refresh: () -> Void
 
     var body: some View {
         Form {
@@ -14,10 +16,13 @@ struct SettingsView: View {
                 ForEach(settings.knownOrgs) { org in
                     Toggle(org.name, isOn: Binding(get: { settings.isShown(org) }, set: { show(org, $0) }))
                 }
-                Picker("Shared with the desktop app", selection: Binding(
-                    get: { settings.primaryOrg ?? "" },
-                    set: { settings.primaryOrg = $0; refreshOrgs() })) {
-                    ForEach(settings.knownOrgs.filter { settings.isShown($0) }) { Text($0.name).tag($0.id) }
+                // Only matters with two orgs to choose between.
+                if settings.knownOrgs.filter({ settings.isShown($0) }).count > 1 {
+                    Picker("Shared with the desktop app", selection: Binding(
+                        get: { settings.primaryOrg ?? "" },
+                        set: { settings.primaryOrg = $0; refreshOrgs() })) {
+                        ForEach(settings.knownOrgs.filter { settings.isShown($0) }) { Text($0.name).tag($0.id) }
+                    }
                 }
             }
             Section("Notifications") {
@@ -55,10 +60,9 @@ struct SettingsView: View {
     }
 
     private func show(_ org: Org, _ on: Bool) {
-        var ids = Set(settings.knownOrgs.filter { settings.isShown($0) }.map(\.id))
-        if on { ids.insert(org.id) } else { ids.remove(org.id) }
-        settings.shownOrgs = Array(ids)
+        settings.orgChoices[org.id] = on
         refreshOrgs()
+        if on { refresh() }
     }
 
     private func refreshOrgs() {
