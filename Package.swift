@@ -9,6 +9,11 @@ let package = Package(
             name: "ClaudeDockCore",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        .executableTarget(
+            name: "ClaudeDock",
+            dependencies: ["ClaudeDockCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .testTarget(
             name: "ClaudeDockCoreTests",
             dependencies: ["ClaudeDockCore"],

@@ -19,12 +19,12 @@ public struct Formatting: Sendable {
     /// "Mon Oct 5"
     public func weekStartLabel(_ date: Date) -> String { format(date, "EEE MMM d") }
 
-    /// "1d 10h", "3h 5m" or "12m". Negative intervals read as "0m".
+    /// "1d 10h", "3h 5m", "2h" or "12m". Negative intervals read as "0m".
     public static func compact(_ interval: TimeInterval) -> String {
         let minutes = max(Int(interval / 60), 0)
         let days = minutes / 1440, hours = (minutes % 1440) / 60, rest = minutes % 60
         if days > 0 { return "\(days)d \(hours)h" }
-        if hours > 0 { return "\(hours)h \(rest)m" }
+        if hours > 0 { return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m" }
         return "\(rest)m"
     }
 

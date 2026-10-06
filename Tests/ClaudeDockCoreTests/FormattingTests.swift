@@ -18,6 +18,7 @@ import Testing
         #expect(Formatting.compact(34 * 3600 + 20 * 60) == "1d 10h")
         #expect(Formatting.compact(3 * 3600 + 5 * 60) == "3h 5m")
         #expect(Formatting.compact(12 * 60) == "12m")
+        #expect(Formatting.compact(2 * 3600) == "2h")
         #expect(Formatting.compact(-5) == "0m")
     }
 
