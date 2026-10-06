@@ -39,8 +39,7 @@ extension EnvironmentValues {
 }
 
 /// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
-/// clear Liquid Glass, which matched the Dock side by side (the regular variant reads
-/// noticeably whiter). Otherwise a frosted material.
+/// clear Liquid Glass, tuned to match the Dock. Otherwise a frosted material.
 struct HUDBackground: ViewModifier {
     @Environment(\.solidBackground) private var solid
     @Environment(\.colorScheme) private var scheme
@@ -56,7 +55,12 @@ struct HUDBackground: ViewModifier {
                 .overlay(shape.strokeBorder(Color.primary.opacity(0.12)))
                 .clipShape(shape)
         } else if glass, #available(macOS 26.0, *) {
-            content.clipShape(shape).glassEffect(.clear, in: shape)
+            // Clear Liquid Glass at 75% with a soft light rim: side by side with the Dock this
+            // let the wallpaper through about as much and kept the same defined edge (full
+            // strength read milkier; 40-60% lost the edge).
+            content.clipShape(shape)
+                .background { Color.clear.glassEffect(.clear, in: shape).opacity(0.75) }
+                .overlay(shape.strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
         } else {
             content
                 .background(shape.fill(.regularMaterial))
@@ -69,3 +73,4 @@ struct HUDBackground: ViewModifier {
 extension View {
     func hud(radius: CGFloat, glass: Bool = false) -> some View { modifier(HUDBackground(radius: radius, glass: glass)) }
 }
+

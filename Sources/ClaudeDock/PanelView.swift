@@ -106,8 +106,7 @@ private struct OrgSection: View {
                 BarRow(label: "5 hours", used: reading.session, tick: reading.sessionElapsedFraction(now: model.now),
                        detail: reading.sessionResetsAt.map {
                            "\(Formatting.percent(reading.session)) used · till \(model.formatting.dayTime($0, now: model.now))"
-                       } ?? "not started",
-                       off: reading.sessionResetsAt == nil)
+                       } ?? "not started")
             } else {
                 Text("No reading yet.").font(.system(size: 11)).foregroundStyle(.secondary)
             }
@@ -138,12 +137,11 @@ private struct BarRow: View {
     var used: Double
     var tick: Double?
     var detail: String
-    var off = false
 
     var body: some View {
         HStack(spacing: 8) {
             Text(label).font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
-            UsageBar(used: used, tick: tick, color: Palette.accent, off: off)
+            UsageBar(used: used, tick: tick, color: Palette.accent)
             Text(detail).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).frame(width: 128, alignment: .trailing)
         }
         .padding(.top, 2)

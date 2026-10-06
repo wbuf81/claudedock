@@ -71,11 +71,9 @@ private struct OrgBlock: View {
                     StoplightDot(light: light, size: 9 * k)
                 }
                 UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
-                         color: Palette.accent, height: 6 * k, off: reading?.sessionResetsAt == nil)
-                Text(reading.map {
-                    Copy.widgetSubline($0, light: light, forecast: forecast, now: model.now,
-                                       formatting: model.formatting, model.settings.thresholds)
-                } ?? "no reading yet")
+                         color: Palette.accent, height: 6 * k)
+                Text(reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) }
+                     ?? "no reading yet")
                 .font(.system(size: 11 * k, weight: .medium))
                 .foregroundStyle(Color.primary.opacity(0.75))
                 .lineLimit(1)

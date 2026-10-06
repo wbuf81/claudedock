@@ -7,23 +7,11 @@ public enum Copy {
         public var warning: String?
     }
 
-    /// Under the widget's 5-hour bar.
-    public static func widgetSubline(_ r: Reading, light: Light, forecast: WeekForecast?, now: Date,
-                                     formatting: Formatting, _ t: Thresholds = Thresholds()) -> String {
-        if light == .red, let back = backTime(r, t) {
-            return "back \(formatting.dayTime(back, now: now))" + (r.sessionResetsAt == nil ? " · 5h idle" : "")
-        }
-        guard let reset = r.sessionResetsAt else { return "5h idle" }
-        let into = now.timeIntervalSince(reset.addingTimeInterval(-5 * 3600))
-        return "5h: \(Formatting.percent(r.session)) used · \(Formatting.compact(into)) in"
-    }
-
-    /// When a red org can be used again: its week reset if the week is nearly out, its
-    /// 5-hour reset if that window is maxed; nil when it's red only for running out early.
-    public static func backTime(_ r: Reading, _ t: Thresholds) -> Date? {
-        if r.weekLeft < t.redWeekLeft { return r.weekResetsAt }
-        if r.session >= t.redSession { return r.sessionResetsAt }
-        return nil
+    /// Under the widget's 5-hour bar, the same shape for every org: the 5-hour window's use,
+    /// then when the week resets ("5h 19% · ↺ Fri 4 AM"). The ring and dot carry the state.
+    public static func widgetSubline(_ r: Reading, now: Date, formatting: Formatting) -> String {
+        let week = r.weekResetsAt.map { "↺ \(formatting.dayTime($0, now: now))" } ?? "week not started"
+        return "5h \(Formatting.percent(r.session)) · \(week)"
     }
 
     /// "62% of the week gone · resets Fri 4 AM"

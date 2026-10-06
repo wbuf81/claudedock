@@ -27,24 +27,22 @@ struct WeekRing: View {
     }
 }
 
-/// A thin bar: fill = % used, tick = how far through the window we are.
+/// A thin bar: fill = % used, tick = how far through the window we are (none when no
+/// window is open). Every bar uses the same track, so idle and busy bars look alike.
 struct UsageBar: View {
     var used: Double
     var tick: Double?
     var color: Color
     var height: CGFloat = 6
-    var off = false
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(off ? Color.primary.opacity(0.12) : color.opacity(0.26))
-                if !off {
-                    Capsule().fill(color).frame(width: used > 0 ? max(geo.size.width * used / 100, height) : 0)
-                    if let tick {
-                        Capsule().fill(Color.primary).frame(width: 2, height: height * 2)
-                            .offset(x: geo.size.width * tick - 1)
-                    }
+                Capsule().fill(color.opacity(0.26))
+                Capsule().fill(color).frame(width: used > 0 ? max(geo.size.width * used / 100, height) : 0)
+                if let tick {
+                    Capsule().fill(Color.primary).frame(width: 2, height: height * 2)
+                        .offset(x: geo.size.width * tick - 1)
                 }
             }
         }

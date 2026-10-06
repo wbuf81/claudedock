@@ -49,19 +49,13 @@ import Testing
                 == "62% of the week gone · resets Fri 4 AM")
     }
 
-    @Test func widgetSublines() {
-        #expect(Copy.widgetSubline(primary, light: light(primary), forecast: forecast(primary), now: designNow, formatting: fmt)
-                == "5h: 1% used · 12m in")
-        #expect(Copy.widgetSubline(overflow, light: light(overflow), forecast: forecast(overflow), now: designNow, formatting: fmt)
-                == "back Wed 9 PM · 5h idle")
+    // Every org's caption has the same shape: the 5-hour window, then when the week resets.
+    @Test func widgetSublinesShareOneShape() {
+        #expect(Copy.widgetSubline(primary, now: designNow, formatting: fmt) == "5h 1% · ↺ Fri 4 AM")
+        #expect(Copy.widgetSubline(overflow, now: designNow, formatting: fmt) == "5h 0% · ↺ Wed 9 PM")
         let idle = reading(week: 20, weekResetsAt: local(2026, 10, 9, 4))
-        #expect(Copy.widgetSubline(idle, light: light(idle), forecast: forecast(idle), now: designNow, formatting: fmt) == "5h idle")
-    }
-
-    @Test func backTimeIsTheBlockingWindow() {
-        #expect(Copy.backTime(overflow, Thresholds()) == local(2026, 10, 7, 21))
-        let maxed = reading(week: 40, weekResetsAt: local(2026, 10, 9, 4), session: 97, sessionResetsAt: local(2026, 10, 6, 13))
-        #expect(Copy.backTime(maxed, Thresholds()) == local(2026, 10, 6, 13))
-        #expect(Copy.backTime(primary, Thresholds()) == nil)
+        #expect(Copy.widgetSubline(idle, now: designNow, formatting: fmt) == "5h 0% · ↺ Fri 4 AM")
+        let fresh = reading(week: 0, weekResetsAt: nil)
+        #expect(Copy.widgetSubline(fresh, now: designNow, formatting: fmt) == "5h 0% · week not started")
     }
 }
