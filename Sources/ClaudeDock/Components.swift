@@ -90,6 +90,8 @@ struct WidgetActions {
     var place: (SnapPoint) -> Void = { _ in }
     var layout: (LayoutChoice) -> Void = { _ in }
     var size: (Double) -> Void = { _ in }
+    /// Turns Shrink until hovered on or off.
+    var compact: (Bool) -> Void = { _ in }
     /// A trackpad pinch: the magnification so far, and whether the pinch has ended.
     var pinch: (Double, Bool) -> Void = { _, _ in }
 

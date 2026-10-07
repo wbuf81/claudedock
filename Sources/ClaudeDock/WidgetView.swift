@@ -166,6 +166,7 @@ struct WidgetView: View {
                 check(name, abs(settings.sizeScale - scale) < 0.01) { actions.size(scale) }
             }
         }
+        check("Shrink until hovered", settings.compact) { actions.compact(!settings.compact) }
         Button("Hide for 1 hour", action: actions.hide)
         Button("Settings…", action: actions.settings)
         Button(model.signedIn ? "Sign out" : "Sign in…", action: actions.signInOut)

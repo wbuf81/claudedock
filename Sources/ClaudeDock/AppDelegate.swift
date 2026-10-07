@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             place: { [weak self] in self?.dock.place($0) },
             layout: { [weak self] in self?.dock.setLayout($0) },
             size: { [weak self] in self?.dock.setSize($0) },
+            compact: { [weak self] in self?.dock.setCompact($0) },
             pinch: { [weak self] in self?.dock.pinch($0, ended: $1) }))
 
         dock.onPanelOpened = { [weak self] in
