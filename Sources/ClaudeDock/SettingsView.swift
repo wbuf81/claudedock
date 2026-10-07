@@ -35,8 +35,6 @@ struct SettingsView: View {
                 threshold("Red when the 5-hour window reaches", \.redSession, "%")
                 threshold("Yellow when the 5-hour window reaches", \.yellowSession, "%")
                 threshold("On pace when unused is under", \.onPaceUnused, "%")
-                threshold("Normal pulse from unused", \.normalPulseUnused, "%")
-                threshold("Fast pulse above unused", \.fastPulseUnused, "%")
                 threshold("Suggest an org with week left of", \.eligibleWeekLeft, "%")
                 threshold("…and its 5-hour window under", \.eligibleSessionBelow, "%")
                 threshold("Desktop app buffer (week left)", \.primaryReserveWeekLeft, "%")

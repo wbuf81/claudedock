@@ -86,6 +86,20 @@ public enum LayoutChoice: String, Codable, CaseIterable, Sendable {
     case automatic, horizontal, vertical
 }
 
+/// The edges that stay put when the compact widget grows to its full size.
+public struct GrowthAnchor: Equatable, Sendable {
+    public enum Horizontal: Sendable { case left, right }
+    public enum Vertical: Sendable { case bottom, top, center }
+
+    public var horizontal: Horizontal
+    public var vertical: Vertical
+
+    public init(_ horizontal: Horizontal, _ vertical: Vertical) {
+        self.horizontal = horizontal
+        self.vertical = vertical
+    }
+}
+
 public enum WidgetLayout {
     /// Automatic is vertical on the left and right edges, like a side Dock, and horizontal
     /// everywhere else.
@@ -160,6 +174,35 @@ public enum WidgetPlacement {
 
     public static func offset(origin: CGPoint, size: CGSize, screen: CGRect) -> WidgetOffset {
         WidgetOffset(right: screen.maxX - (origin.x + size.width), bottom: origin.y - screen.minY)
+    }
+
+    /// The compact widget grows toward the middle of the screen, so the part under the
+    /// pointer stays under it: from its right edge in the right half and its left edge in
+    /// the left half, from its bottom edge in the lower half and its top edge in the upper
+    /// half. A strip snapped to the middle of a side grows from its vertical centre.
+    public static func anchor(compact: CGRect, visible: CGRect, spot: WidgetSpot?) -> GrowthAnchor {
+        let horizontal: GrowthAnchor.Horizontal = compact.midX >= visible.midX ? .right : .left
+        if case .snapped(let point)? = spot, point == .rightMiddle || point == .leftMiddle {
+            return GrowthAnchor(horizontal, .center)
+        }
+        return GrowthAnchor(horizontal, compact.midY < visible.midY ? .bottom : .top)
+    }
+
+    /// The full widget's frame: `size` grown out of the compact frame from its anchored
+    /// edges, then kept inside the visible frame across, and between the bottom of the
+    /// screen and the menu bar. It may cover a bottom Dock: while expanded it floats above it.
+    public static func expandedFrame(compact: CGRect, size: CGSize, anchor: GrowthAnchor,
+                                     screen: CGRect, visible: CGRect) -> CGRect {
+        let x = anchor.horizontal == .right ? compact.maxX - size.width : compact.minX
+        let y: Double
+        switch anchor.vertical {
+        case .bottom: y = compact.minY
+        case .top: y = compact.maxY - size.height
+        case .center: y = compact.midY - size.height / 2
+        }
+        return CGRect(x: min(max(x, visible.minX), visible.maxX - size.width),
+                      y: min(max(y, screen.minY), visible.maxY - size.height),
+                      width: size.width, height: size.height)
     }
 
     /// The panel opens toward the middle of the screen. Beside a vertical widget on a side;

@@ -16,6 +16,8 @@ enum Renderer {
             for scheme in [ColorScheme.dark, .light] {
                 let suffix = scheme == .dark ? "dark" : "light"
                 write(WidgetView(model: model, actions: .none), scheme, dir.appendingPathComponent("\(scenario.name)-widget-\(suffix).png"))
+                write(WidgetView(model: model, actions: .none, compact: true), scheme,
+                      dir.appendingPathComponent("\(scenario.name)-compact-\(suffix).png"))
                 write(PanelView(model: model, actions: .none), scheme, dir.appendingPathComponent("\(scenario.name)-panel-\(suffix).png"))
             }
         }

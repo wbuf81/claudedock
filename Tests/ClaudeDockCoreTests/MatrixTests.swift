@@ -5,7 +5,8 @@ import Testing
 
 /// Sweeps the placement maths across the Macs, Docks, sizes and org counts other people
 /// will have, checking what must never happen: a widget off screen or under the menu bar or
-/// a side Dock or a bottom Dock, a panel off screen or on top of the widget.
+/// a side Dock or a bottom Dock, a panel off screen or on top of the widget, in full and compact mode (with the full
+/// widget grown out of the compact one).
 @Suite struct MatrixTests {
     struct Display {
         var name: String
@@ -50,6 +51,17 @@ import Testing
         return CGSize(width: (Double(orgs) * 248.5 + 66) * k, height: height)
     }
 
+    /// The compact widget's size, mirroring WidgetView's compact layout: 56 pt columns 6 pt
+    /// apart inside 10 pt of padding plus a 26 pt switch badge, as tall as the Dock bar; or a
+    /// 68 pt strip of 66 pt columns 6 pt apart inside 10 pt of padding plus a 24 pt badge.
+    static func compactSize(orgs: Int, vertical: Bool, screen: CGRect, visible: CGRect, tile: Double, scale: Double) -> CGSize {
+        let k = DockFit.contentScale(screen: screen, visible: visible, tileSize: tile) * scale
+        let n = Double(orgs)
+        if vertical { return CGSize(width: 68 * k, height: (n * 66 + (n - 1) * 6 + 20 + 24) * k) }
+        let height = DockFit.height(screen: screen, visible: visible, tileSize: tile) * scale
+        return CGSize(width: (n * 56 + (n - 1) * 6 + 20 + 26) * k, height: height)
+    }
+
     /// The panel's height: header and status line, plus about 330 pt per org.
     static func panelSize(orgs: Int) -> CGSize { CGSize(width: 372, height: 60 + Double(orgs) * 330) }
 
@@ -67,15 +79,19 @@ import Testing
                         for spot in [nil] + SnapPoint.allCases.map({ WidgetSpot.snapped($0) }) {
                             let vertical = WidgetLayout.isVertical(spot: spot, choice: .automatic)
                             for wanted in Self.sizeScales {
+                                for compact in [false, true] {
                                 let natural = Self.widgetSize(orgs: orgs, vertical: vertical, screen: screen,
                                                               visible: visible, tile: tile, scale: 1)
                                 let scale = WidgetLayout.fittedScale(wanted, natural: natural, visible: visible)
-                                let size = Self.widgetSize(orgs: orgs, vertical: vertical, screen: screen,
+                                let full = Self.widgetSize(orgs: orgs, vertical: vertical, screen: screen,
                                                            visible: visible, tile: tile, scale: scale)
+                                let size = compact
+                                    ? Self.compactSize(orgs: orgs, vertical: vertical, screen: screen, visible: visible, tile: tile, scale: scale)
+                                    : full
                                 let origin = WidgetPlacement.origin(size: size, screen: screen, visible: visible, spot: spot,
                                                                     dockWidth: dockWidth)
                                 let widget = CGRect(origin: origin, size: size)
-                                let label = "\(display.name), Dock \(side) \(Int(tile)) pt with \(items) items, \(orgs) org(s), \(spot.map { "\($0)" } ?? "default"), size \(wanted)"
+                                let label = "\(display.name), Dock \(side) \(Int(tile)) pt with \(items) items, \(orgs) org(s), \(spot.map { "\($0)" } ?? "default"), size \(wanted), \(compact ? "compact" : "full")"
 
                                 if widget.minX < visible.minX - 0.5 || widget.maxX > visible.maxX + 0.5 {
                                     problems.append("\(label): widget under a side Dock or off screen \(widget)")
@@ -86,15 +102,33 @@ import Testing
                                     problems.append("\(label): widget under the Dock \(widget) vs \(dock)")
                                 }
 
-                                let panel = WidgetPlacement.panelFrame(panel: Self.panelSize(orgs: orgs), widget: widget, visible: visible)
+                                // Compact mode: the full widget grown out of it may cover the Dock (it floats
+                                // above it), but must stay on screen, below the menu bar, and over the compact one.
+                                let shown = compact
+                                    ? WidgetPlacement.expandedFrame(compact: widget, size: full,
+                                                                    anchor: WidgetPlacement.anchor(compact: widget, visible: visible, spot: spot),
+                                                                    screen: screen, visible: visible)
+                                    : widget
+                                if compact {
+                                    if shown.minX < visible.minX - 0.5 || shown.maxX > visible.maxX + 0.5
+                                        || shown.minY < screen.minY - 0.5 || shown.maxY > visible.maxY + 0.5 {
+                                        problems.append("\(label): expanded widget off screen or under the menu bar \(shown)")
+                                    }
+                                    if !shown.insetBy(dx: -0.5, dy: -0.5).contains(widget) {
+                                        problems.append("\(label): expanded widget doesn't cover the compact one \(shown) vs \(widget)")
+                                    }
+                                }
+
+                                let panel = WidgetPlacement.panelFrame(panel: Self.panelSize(orgs: orgs), widget: shown, visible: visible)
                                 if panel.minX < visible.minX + 7.5 || panel.maxX > visible.maxX - 7.5
                                     || panel.minY < visible.minY + 7.5 || panel.maxY > visible.maxY - 7.5 {
                                     problems.append("\(label): panel off screen \(panel)")
                                 }
-                                if panel.insetBy(dx: 1, dy: 1).intersects(widget) {
-                                    problems.append("\(label): panel covers the widget \(panel) vs \(widget)")
+                                if panel.insetBy(dx: 1, dy: 1).intersects(shown) {
+                                    problems.append("\(label): panel covers the widget \(panel) vs \(shown)")
                                 }
                                 if panel.height < 240 { problems.append("\(label): panel squeezed to \(Int(panel.height)) pt") }
+                                }
                             }
                         }
                     }

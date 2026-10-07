@@ -31,17 +31,14 @@ func forecastWith(unused: Double, early: Double? = nil) -> WeekForecast {
         #expect(light(week: 90) != .red)                      // exactly 10% left is not red
     }
 
-    @Test func greenPulseBuckets() {
-        #expect(light(unused: 5) == .green(.slow))
-        #expect(light(unused: 9.9) == .green(.slow))
-        #expect(light(unused: 10) == .green(.normal))
-        #expect(light(unused: 25) == .green(.normal))
-        #expect(light(unused: 25.1) == .green(.fast))
+    @Test func greenWhenTokensWouldGoUnused() {
+        #expect(light(unused: 5) == .green)
+        #expect(light(unused: 25.1) == .green)
     }
 
     // Review Focus 1
-    @Test func weekNotStartedIsSteadyGreen() {
-        #expect(Stoplight.light(reading(week: 0, weekResetsAt: nil), nil) == .green(nil))
+    @Test func weekNotStartedIsGreen() {
+        #expect(Stoplight.light(reading(week: 0, weekResetsAt: nil), nil) == .green)
         #expect(Stoplight.light(reading(week: 0, weekResetsAt: nil, session: 85), nil) == .yellow)
     }
 
@@ -54,8 +51,13 @@ func forecastWith(unused: Double, early: Double? = nil) -> WeekForecast {
     @Test func defaultsMatchTheSpec() {
         let t = Thresholds()
         #expect([t.redWeekLeft, t.redRunsOutEarlyHours, t.redSession, t.yellowSession, t.onPaceUnused,
-                 t.normalPulseUnused, t.fastPulseUnused, t.eligibleWeekLeft, t.eligibleSessionBelow,
-                 t.primaryReserveWeekLeft] == [10, 12, 95, 80, 5, 10, 25, 10, 80, 15])
-        #expect(Pulse.slow.rawValue == 2.8 && Pulse.normal.rawValue == 1.6 && Pulse.fast.rawValue == 0.9)
+                 t.eligibleWeekLeft, t.eligibleSessionBelow, t.primaryReserveWeekLeft] == [10, 12, 95, 80, 5, 10, 80, 15])
+    }
+
+    // Settings saved before the dot stopped pulsing still hold the two pulse thresholds.
+    @Test func thresholdsSavedWithPulseFieldsStillLoad() throws {
+        let saved = #"{"redWeekLeft":20,"redRunsOutEarlyHours":12,"redSession":95,"yellowSession":80,"onPaceUnused":5,"normalPulseUnused":10,"fastPulseUnused":25,"eligibleWeekLeft":10,"eligibleSessionBelow":80,"primaryReserveWeekLeft":15}"#
+        let t = try JSONDecoder().decode(Thresholds.self, from: Data(saved.utf8))
+        #expect(t.redWeekLeft == 20 && t.primaryReserveWeekLeft == 15)
     }
 }

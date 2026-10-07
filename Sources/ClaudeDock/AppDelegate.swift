@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var demo: Task<Void, Never>?
     private var clock: Timer?
+    private var claudeCodeActivity: ClaudeCodeActivity?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = Settings(defaults: .standard)
@@ -30,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             place: { [weak self] in self?.dock.place($0) },
             layout: { [weak self] in self?.dock.setLayout($0) },
             size: { [weak self] in self?.dock.setSize($0) },
+            compact: { [weak self] in self?.dock.setCompact($0) },
+            effect: { [weak self] in self?.model.settings.effectStyle = $0 },
+            amount: { [weak self] in self?.model.settings.effectAmount = $0 },
             pinch: { [weak self] in self?.dock.pinch($0, ended: $1) }))
 
         dock.onPanelOpened = { [weak self] in
@@ -67,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.model.tick()
             }
         }
+
+        claudeCodeActivity = ClaudeCodeActivity { [weak self] time in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.claudeCodeWorked(at: time) } }
+        }
+        claudeCodeActivity?.start()
 
         registerLoginItemOnce()
         dock.show()

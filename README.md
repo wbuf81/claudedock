@@ -42,13 +42,22 @@ at the end of the week. Claude Dock answers that at a glance, without opening a 
 |---|---|
 | **Ring** | How much of this week's limit is used. The **tick** on the ring is how much of the week has gone by: keep the fill up near the tick and nothing goes unused. |
 | **Bar** | How much of the current **5-hour window** is used. Its tick is how far into the window you are. |
-| **Dot** | 🟢 **use it**: at your current pace tokens would go unused at reset (it pulses faster the more would go to waste) · 🟡 **on pace** · 🔴 **nearly out** |
+| **Dot** | 🟢 **use it**: at your current pace tokens would go unused at reset · 🟡 **on pace** · 🔴 **nearly out** |
 | **Caption** | `5h 19% · ↺ Fri 4 AM`: the 5-hour window's use, then when the week resets. |
+| **Particles** | The org is in use right now: Claude Code is working on it, or its usage went up at the last reading (which also catches the desktop app, up to 3 minutes late). |
 | **⇄ tab** | Appears only when Claude Code should switch orgs, e.g. `Charizard first`. |
 
 It's as tall as your Dock, its rings are the size of your Dock icons, and it uses the same
 clear Liquid Glass, so it looks like part of the Dock. Hover over an org for the whole
 story in a sentence (VoiceOver reads the same).
+
+**Small until you need it.** The widget starts compact: each org's ring, name and 5-hour
+line. Rest the pointer on it and it grows into the full widget, over the Dock if it has
+to; move away and it shrinks back. Click it for the panel either way.
+
+<p align="center">
+  <img src="docs/images/compact.jpg" alt="The compact widget beside the Dock, and the full widget it grows to on hover" width="880">
+</p>
 
 With one org, there's nothing to switch between, so you just get the ring, bar and dot.
 
@@ -63,8 +72,9 @@ the side, and the panel opens beside it.
 </p>
 
 Right-click it for **Position** (any corner or side), **Layout** (automatic, horizontal or
-vertical) and **Size** (Small, Match Dock, Large, Extra large), or pinch on your trackpad
-over it to resize freely.
+vertical), **Size** (Small, Match Dock, Large, Extra large), **Shrink until hovered** (on
+by default) and **In-use effect** (Sparks, Flow, Shimmer or Off, and Subtle, Normal or
+Lots), or pinch on your trackpad over it to resize freely.
 
 ## Every state
 
@@ -95,7 +105,7 @@ weeks reset at different times.
 |---|---|
 | 🔴 | under 10% of the week left, or on track to run out 12+ hours before reset, or the 5-hour window is 95%+ used |
 | 🟡 | the 5-hour window is 80%+ used, or less than 5% would go unused, or running out slightly early |
-| 🟢 | 5% or more would go unused. Pulses slowly under 10%, normally at 10–25%, fast above 25% |
+| 🟢 | 5% or more would go unused |
 
 **Switching orgs:** an org can take Claude Code when it has at least 10% of its week left and
 its 5-hour window is under 80% used (the org shared with the desktop app also keeps a 15%
@@ -164,6 +174,8 @@ red, and if claude.ai signs it out.
 - It only **reads**: GET requests to claude.ai's usage endpoints every 3 minutes. It never
   sends chats, changes settings or touches billing.
 - It reads **one field** from `~/.claude.json`: which org Claude Code is signed into.
+- It watches `~/.claude/projects` for changes, to know when Claude Code is working. It
+  never opens those files.
 - History stays on your Mac in `~/Library/Application Support/ClaudeDock/`, kept 35 days.
 - No analytics, no other servers.
 

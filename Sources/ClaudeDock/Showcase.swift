@@ -33,17 +33,18 @@ enum Showcase {
         let side = model(scenarios[0])
         side.vertical = true
         write(SideScene(model: side), size: CGSize(width: 1000, height: 820), scheme: .dark, to: dir, "vertical.png")
+        write(CompactScene(model: main), size: CGSize(width: 1180, height: 330), scheme: .dark, to: dir, "compact.png")
         try? FileManager.default.removeItem(at: history)
         print("Showcase written to \(dir.path)")
     }
 
     /// One line per demo scenario, in `DemoData.scenarios` order.
     static let captions = [
-        "Pikachu is green and pulsing: tokens would go unused. Charizard is nearly out.",
+        "Pikachu is green: tokens would go unused. Charizard is nearly out.",
         "Pikachu's 5-hour window is busy, so move Claude Code to Charizard and leave room for the desktop app.",
         "Charizard's week resets first, so use it before it expires.",
         "Both are low: Charizard is back first.",
-        "Pikachu is on pace (yellow) but down to its last 12%, so Charizard, whose week hasn't started (steady green), goes first.",
+        "Pikachu is on pace (yellow) but down to its last 12%, so Charizard, whose week hasn't started, goes first.",
     ]
 
     /// `--matrix DIR`: the widget across org counts, name lengths, layouts and sizes, and the
@@ -84,13 +85,15 @@ enum Showcase {
         }
         for scheme in [ColorScheme.dark, .light] {
             let suffix = scheme == .dark ? "dark" : "light"
-            var rows: [(String, AppModel)] = []
+            var rows: [(String, AppModel, Bool)] = []
             for set in sets {
-                for size in [0.8, 1.0, 1.5] { rows.append(("\(set.0) · \(Int(size * 100))%", model(set, size: size, vertical: false))) }
+                for size in [0.8, 1.0, 1.5] { rows.append(("\(set.0) · \(Int(size * 100))%", model(set, size: size, vertical: false), false)) }
+                rows.append(("\(set.0) · compact", model(set, size: 1, vertical: false), true))
             }
             write(MatrixSheet(rows: rows), size: CGSize(width: 1500, height: 2400), scheme: scheme, to: dir, "matrix-horizontal-\(suffix).png")
-            let strips = sets.map { ($0.0, model($0, size: 1, vertical: true)) }
-            write(StripSheet(strips: strips), size: CGSize(width: 900, height: 760), scheme: scheme, to: dir, "matrix-vertical-\(suffix).png")
+            let strips = sets.flatMap { [($0.0, model($0, size: 1, vertical: true), false),
+                                         ("\($0.0) · compact", model($0, size: 1, vertical: true), true)] }
+            write(StripSheet(strips: strips), size: CGSize(width: 1500, height: 760), scheme: scheme, to: dir, "matrix-vertical-\(suffix).png")
             write(HStack(alignment: .top, spacing: 24) {
                 PanelView(model: model(sets[0], size: 1, vertical: false), actions: .none).fixedSize()
                 PanelView(model: model(sets[2], size: 1, vertical: false), actions: .none).fixedSize()
@@ -168,6 +171,34 @@ private struct DesktopScene: View {
     }
 }
 
+/// The bottom-right of a desktop twice: the compact widget beside the Dock, and the full
+/// widget it grows to when the pointer rests on it.
+private struct CompactScene: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Wallpaper(dark: true)
+            VStack(spacing: 40) {
+                row(compact: true)
+                row(compact: false)
+            }
+            .padding(.vertical, 30)
+        }
+    }
+
+    private func row(compact: Bool) -> some View {
+        ZStack {
+            FakeDock()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, -160)
+            WidgetView(model: model, actions: .none, compact: compact).fixedSize()
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
+        }
+    }
+}
+
 /// The right edge of a desktop: the vertical strip with its panel opened beside it.
 private struct SideScene: View {
     @ObservedObject var model: AppModel
@@ -186,7 +217,7 @@ private struct SideScene: View {
 }
 
 private struct MatrixSheet: View {
-    var rows: [(String, AppModel)]
+    var rows: [(String, AppModel, Bool)]
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -195,7 +226,7 @@ private struct MatrixSheet: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 20) {
                         Text(row.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white).frame(width: 190, alignment: .leading)
-                        WidgetView(model: row.1, actions: .none).fixedSize()
+                        WidgetView(model: row.1, actions: .none, compact: row.2).fixedSize()
                     }
                 }
             }
@@ -205,7 +236,7 @@ private struct MatrixSheet: View {
 }
 
 private struct StripSheet: View {
-    var strips: [(String, AppModel)]
+    var strips: [(String, AppModel, Bool)]
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -214,7 +245,8 @@ private struct StripSheet: View {
                 ForEach(Array(strips.enumerated()), id: \.offset) { _, strip in
                     VStack(spacing: 10) {
                         Text(strip.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
-                        WidgetView(model: strip.1, actions: .none).fixedSize()
+                            .frame(width: 110).lineLimit(2).multilineTextAlignment(.center)
+                        WidgetView(model: strip.1, actions: .none, compact: strip.2).fixedSize()
                     }
                 }
             }

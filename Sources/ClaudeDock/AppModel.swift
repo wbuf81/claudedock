@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import ClaudeDockCore
 
@@ -23,6 +24,12 @@ final class AppModel: ObservableObject {
     @Published var widgetHeight: CGFloat = 60
     /// Stacked as a narrow strip, for the left and right edges.
     @Published var vertical = false
+    /// When Claude Code last wrote a transcript; it writes every few seconds while it works.
+    private(set) var claudeCodeActiveAt: Date?
+    /// Each org's reading before its newest, to tell whether its usage just went up.
+    private var previous: [String: Reading] = [:]
+    private var settingsChanges: AnyCancellable?
+    private var claudeCodeQuietCheck: Timer?
 
     let settings: Settings
     let formatting = Formatting()
@@ -47,6 +54,8 @@ final class AppModel: ObservableObject {
         self.store = store
         try? store.prune(olderThan: Date().addingTimeInterval(-Self.keep))
         history = Self.recent(store.load(), now: Date())
+        // The widget redraws when the in-use effect or its amount changes.
+        settingsChanges = settings.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     private static func recent(_ readings: [Reading], now: Date) -> [Reading] {
@@ -65,6 +74,12 @@ final class AppModel: ObservableObject {
     }
     func light(for org: Org) -> Light? {
         reading(for: org).map { Stoplight.light($0, forecast(for: org), settings.thresholds) }
+    }
+
+    /// Whether an org is being used right now; it gets the in-use effect.
+    func inUse(for org: Org) -> Bool {
+        InUse.isInUse(org: org.id, latest: latest[org.id], previous: previous[org.id], claudeCodeOrg: claudeCodeOrg,
+                      claudeCodeActiveAt: claudeCodeActiveAt, stale: isStale, now: now)
     }
 
     var statuses: [OrgStatus] {
@@ -97,7 +112,10 @@ final class AppModel: ObservableObject {
         let wasRed = currentOrgIsRed
         now = time
         self.claudeCodeOrg = claudeCodeOrg
-        for r in outcome.readings { latest[r.org] = r }
+        for r in outcome.readings {
+            if let old = latest[r.org] { previous[r.org] = old }
+            latest[r.org] = r
+        }
         history = Self.recent(history + outcome.readings, now: time)
         try? store.append(outcome.readings)
         signedIn = true
@@ -145,6 +163,20 @@ final class AppModel: ObservableObject {
         updateAdvice()
     }
 
+    /// Claude Code wrote a transcript. Publishes only when that starts its org's in-use
+    /// effect (writes come every second or so while it works); a check just after the quiet
+    /// period ends the effect on time.
+    func claudeCodeWorked(at time: Date) {
+        guard !showingDemo else { return }
+        let wasWorking = claudeCodeActiveAt.map { time.timeIntervalSince($0) < InUse.claudeCodeQuiet } ?? false
+        claudeCodeActiveAt = time
+        if !wasWorking { now = time }
+        claudeCodeQuietCheck?.invalidate()
+        claudeCodeQuietCheck = Timer.scheduledTimer(withTimeInterval: InUse.claudeCodeQuiet + 0.5, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+    }
+
     func tick() { now = Date() }
 
     private var currentOrgIsRed: Bool { statuses.first { $0.org.id == claudeCodeOrg }?.light == .red }
@@ -164,6 +196,8 @@ final class AppModel: ObservableObject {
         clearProblems()
         orgs = scenario.orgs
         latest = Dictionary(uniqueKeysWithValues: scenario.readings.map { ($0.org, $0) })
+        previous = [:]
+        claudeCodeActiveAt = scenario.claudeCodeWorking ? scenario.now : nil
         history = []
         claudeCodeOrg = scenario.claudeCodeOrg
         now = scenario.now
@@ -177,6 +211,8 @@ final class AppModel: ObservableObject {
         clearProblems()
         orgs = []
         latest = [:]
+        previous = [:]
+        claudeCodeActiveAt = nil
         advice = nil
         history = Self.recent(store.load(), now: Date())
         now = Date()
