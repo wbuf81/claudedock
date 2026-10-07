@@ -29,6 +29,7 @@ final class AppModel: ObservableObject {
     /// Each org's reading before its newest, to tell whether its usage just went up.
     private var previous: [String: Reading] = [:]
     private var settingsChanges: AnyCancellable?
+    private var claudeCodeQuietCheck: Timer?
 
     let settings: Settings
     let formatting = Formatting()
@@ -160,6 +161,20 @@ final class AppModel: ObservableObject {
         guard id != claudeCodeOrg, !showingDemo else { return }
         claudeCodeOrg = id
         updateAdvice()
+    }
+
+    /// Claude Code wrote a transcript. Publishes only when that starts its org's in-use
+    /// effect (writes come every second or so while it works); a check just after the quiet
+    /// period ends the effect on time.
+    func claudeCodeWorked(at time: Date) {
+        guard !showingDemo else { return }
+        let wasWorking = claudeCodeActiveAt.map { time.timeIntervalSince($0) < InUse.claudeCodeQuiet } ?? false
+        claudeCodeActiveAt = time
+        if !wasWorking { now = time }
+        claudeCodeQuietCheck?.invalidate()
+        claudeCodeQuietCheck = Timer.scheduledTimer(withTimeInterval: InUse.claudeCodeQuiet + 0.5, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
     }
 
     func tick() { now = Date() }

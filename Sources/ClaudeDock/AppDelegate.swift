@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var demo: Task<Void, Never>?
     private var clock: Timer?
+    private var claudeCodeActivity: ClaudeCodeActivity?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = Settings(defaults: .standard)
@@ -70,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.model.tick()
             }
         }
+
+        claudeCodeActivity = ClaudeCodeActivity { [weak self] time in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.claudeCodeWorked(at: time) } }
+        }
+        claudeCodeActivity?.start()
 
         registerLoginItemOnce()
         dock.show()
