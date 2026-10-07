@@ -84,13 +84,15 @@ enum Showcase {
         }
         for scheme in [ColorScheme.dark, .light] {
             let suffix = scheme == .dark ? "dark" : "light"
-            var rows: [(String, AppModel)] = []
+            var rows: [(String, AppModel, Bool)] = []
             for set in sets {
-                for size in [0.8, 1.0, 1.5] { rows.append(("\(set.0) · \(Int(size * 100))%", model(set, size: size, vertical: false))) }
+                for size in [0.8, 1.0, 1.5] { rows.append(("\(set.0) · \(Int(size * 100))%", model(set, size: size, vertical: false), false)) }
+                rows.append(("\(set.0) · compact", model(set, size: 1, vertical: false), true))
             }
             write(MatrixSheet(rows: rows), size: CGSize(width: 1500, height: 2400), scheme: scheme, to: dir, "matrix-horizontal-\(suffix).png")
-            let strips = sets.map { ($0.0, model($0, size: 1, vertical: true)) }
-            write(StripSheet(strips: strips), size: CGSize(width: 900, height: 760), scheme: scheme, to: dir, "matrix-vertical-\(suffix).png")
+            let strips = sets.flatMap { [($0.0, model($0, size: 1, vertical: true), false),
+                                         ("\($0.0) · compact", model($0, size: 1, vertical: true), true)] }
+            write(StripSheet(strips: strips), size: CGSize(width: 1500, height: 760), scheme: scheme, to: dir, "matrix-vertical-\(suffix).png")
             write(HStack(alignment: .top, spacing: 24) {
                 PanelView(model: model(sets[0], size: 1, vertical: false), actions: .none).fixedSize()
                 PanelView(model: model(sets[2], size: 1, vertical: false), actions: .none).fixedSize()
@@ -186,7 +188,7 @@ private struct SideScene: View {
 }
 
 private struct MatrixSheet: View {
-    var rows: [(String, AppModel)]
+    var rows: [(String, AppModel, Bool)]
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -195,7 +197,7 @@ private struct MatrixSheet: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 20) {
                         Text(row.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white).frame(width: 190, alignment: .leading)
-                        WidgetView(model: row.1, actions: .none).fixedSize()
+                        WidgetView(model: row.1, actions: .none, compact: row.2).fixedSize()
                     }
                 }
             }
@@ -205,7 +207,7 @@ private struct MatrixSheet: View {
 }
 
 private struct StripSheet: View {
-    var strips: [(String, AppModel)]
+    var strips: [(String, AppModel, Bool)]
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -214,7 +216,8 @@ private struct StripSheet: View {
                 ForEach(Array(strips.enumerated()), id: \.offset) { _, strip in
                     VStack(spacing: 10) {
                         Text(strip.0).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
-                        WidgetView(model: strip.1, actions: .none).fixedSize()
+                            .frame(width: 110).lineLimit(2).multilineTextAlignment(.center)
+                        WidgetView(model: strip.1, actions: .none, compact: strip.2).fixedSize()
                     }
                 }
             }

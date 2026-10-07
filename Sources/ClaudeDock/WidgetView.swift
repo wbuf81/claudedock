@@ -3,14 +3,22 @@ import ClaudeDockCore
 
 /// The always-on widget: one block per org, plus a switch tab when there's advice. A
 /// horizontal bar as tall as the Dock, or a narrow vertical strip on the left and right
-/// edges. Contents scale with the Dock's icon size and the owner's size setting.
+/// edges; in compact mode each org shrinks to its ring, name and 5-hour line. Contents
+/// scale with the Dock's icon size and the owner's size setting.
 struct WidgetView: View {
     @ObservedObject var model: AppModel
     var actions: WidgetActions
+    /// The compact widget: each org's ring, name and 5-hour line. Without orgs it shows the
+    /// same placeholder as the full widget.
+    var compact = false
 
     var body: some View {
         Group {
-            if model.vertical { strip } else { bar }
+            if compact && !model.orgs.isEmpty {
+                if model.vertical { compactStrip } else { compactBar }
+            } else {
+                if model.vertical { strip } else { bar }
+            }
         }
         .opacity(model.isStale ? 0.55 : 1)
         .contentShape(Rectangle())
@@ -63,9 +71,46 @@ struct WidgetView: View {
         .hud(radius: 22 * k, glass: true)
     }
 
+    private var compactBar: some View {
+        HStack(spacing: 0) {
+            if let advice = model.advice {
+                switchBadge(advice)
+                    .frame(width: 26 * k)
+                    .frame(maxHeight: .infinity)
+                    .background(Palette.warn.opacity(0.16))
+            }
+            HStack(spacing: 6 * k) {
+                ForEach(model.orgs) { org in CompactOrg(model: model, org: org, k: k, open: actions.tap) }
+            }
+            .padding(.horizontal, 10 * k)
+        }
+        .frame(height: model.widgetHeight)
+        .hud(radius: model.widgetHeight * 0.27, glass: true)
+    }
+
+    private var compactStrip: some View {
+        VStack(spacing: 0) {
+            if let advice = model.advice {
+                switchBadge(advice)
+                    .frame(height: 24 * k)
+                    .frame(maxWidth: .infinity)
+                    .background(Palette.warn.opacity(0.16))
+            }
+            VStack(spacing: 6 * k) {
+                ForEach(model.orgs) { org in CompactOrg(model: model, org: org, k: k, open: actions.tap) }
+            }
+            .padding(.vertical, 10 * k)
+        }
+        .frame(width: 68 * k)
+        .hud(radius: 22 * k, glass: true)
+    }
+
+    private func switchSummary(_ advice: Advice) -> String {
+        "Move Claude Code to \(advice.target.name): \(advice.reason)."
+    }
+
     private func switchTab(_ advice: Advice) -> some View {
-        let summary = "Move Claude Code to \(advice.target.name): \(advice.reason)."
-        return VStack(spacing: 1 * k) {
+        VStack(spacing: 1 * k) {
             Text("⇄").font(.system(size: 14 * k)).foregroundStyle(Palette.warn)
             Text("\(advice.target.name)\nfirst")
                 .font(.system(size: max(9.5 * k, 9), weight: .semibold))
@@ -75,8 +120,16 @@ struct WidgetView: View {
                 .frame(maxWidth: 64 * k)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(summary)
-        .help(summary)
+        .accessibilityLabel(switchSummary(advice))
+        .help(switchSummary(advice))
+    }
+
+    /// The compact widget's switch tab: just the amber ⇄, saying the same as the full tab.
+    private func switchBadge(_ advice: Advice) -> some View {
+        Text("⇄").font(.system(size: 15 * k)).foregroundStyle(Palette.warn)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(switchSummary(advice))
+            .help(switchSummary(advice))
     }
 
     private var placeholder: some View {
@@ -154,12 +207,7 @@ private struct OrgBlock: View {
                                          forecast: model.forecast(for: org), now: model.now, formatting: model.formatting)
         content
             .opacity(model.reading(for: org) != nil && !model.isFresh(org) && !model.isStale ? 0.55 : 1)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(summary)
-            .accessibilityHint("Opens the details")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction(.default, open)
-            .help(summary)
+            .orgButton(summary, open: open)
     }
 
     @ViewBuilder
@@ -212,5 +260,57 @@ private struct OrgBlock: View {
             .padding(.horizontal, 18 * k)
             .frame(maxHeight: .infinity)
         }
+    }
+}
+
+/// One org in the compact widget: the week ring with its stoplight dot on the edge, the
+/// name, and the 5-hour line, stacked and centred.
+private struct CompactOrg: View {
+    @ObservedObject var model: AppModel
+    let org: Org
+    let k: CGFloat
+    let open: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let reading = model.reading(for: org)
+        let forecast = model.forecast(for: org)
+        let light = model.light(for: org) ?? .yellow
+        let summary = Copy.widgetSummary(org.name, reading, light: model.light(for: org),
+                                         forecast: forecast, now: model.now, formatting: model.formatting)
+        VStack(spacing: 3 * k) {
+            WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
+                     color: light == .red ? Palette.crit : Palette.accent, size: 44 * k)
+                .overlay(alignment: .topTrailing) {
+                    // A rim in the glass's colour keeps the dot readable on top of the ring.
+                    StoplightDot(light: light, size: 9 * k)
+                        .background(Circle().fill(scheme == .dark ? Color.black.opacity(0.35) : Color.white.opacity(0.7))
+                            .padding(-2 * k))
+                        .offset(x: -1 * k, y: 1 * k)
+                }
+            Text(org.name)
+                .font(.system(size: max(10 * k, 9), weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 54 * k)
+            UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
+                     color: Palette.accent, height: 4 * k)
+                .frame(width: 46 * k)
+        }
+        .frame(width: 56 * k)
+        .opacity(reading != nil && !model.isFresh(org) && !model.isStale ? 0.55 : 1)
+        .orgButton(summary, open: open)
+    }
+}
+
+private extension View {
+    /// An org reads as one button to VoiceOver, its sentence also the tooltip.
+    func orgButton(_ summary: String, open: @escaping () -> Void) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(summary)
+            .accessibilityHint("Opens the details")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, open)
+            .help(summary)
     }
 }
