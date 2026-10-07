@@ -158,16 +158,19 @@ final class DockController {
     func place(_ point: SnapPoint) {
         model.settings.widgetSpot = .snapped(point)
         layout()
+        recheckPointerSoon()
     }
 
     func setLayout(_ choice: LayoutChoice) {
         model.settings.layoutChoice = choice
         layout()
+        recheckPointerSoon()
     }
 
     func setSize(_ scale: Double) {
         model.settings.sizeScale = WidgetLayout.clampSize(scale)
         layout()
+        recheckPointerSoon()
     }
 
     func setCompact(_ on: Bool) {
@@ -175,6 +178,13 @@ final class DockController {
         expanded = false
         model.settings.compact = on
         layout()
+        // The panel keeps the widget full size; otherwise grow if the pointer is resting on it.
+        if on && panel.isVisible {
+            setExpanded(true)
+            placePanel()
+        } else {
+            recheckPointerSoon()
+        }
     }
 
     /// Resizes live while pinching, and keeps the size when the pinch ends.
@@ -182,6 +192,7 @@ final class DockController {
         if ended {
             pinchFactor = 1
             model.settings.sizeScale = WidgetLayout.clampSize(model.settings.sizeScale * magnification)
+            recheckPointerSoon()
         } else {
             pinchFactor = WidgetLayout.clampSize(model.settings.sizeScale * magnification) / model.settings.sizeScale
         }
@@ -206,6 +217,11 @@ final class DockController {
     /// somewhere else without an enter or exit event to say so.
     private func recheckPointer() {
         pointerMoved(inside: widget.isVisible && widget.frame.contains(NSEvent.mouseLocation))
+    }
+
+    /// The same, once a layout queued by a settings change has moved or resized the widget.
+    private func recheckPointerSoon() {
+        DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.recheckPointer() } }
     }
 
     /// Grows to the full widget or shrinks back to the compact one: the window's frame
