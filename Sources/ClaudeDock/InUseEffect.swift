@@ -153,7 +153,8 @@ private enum EffectLayersBuilder {
         let m = c.amount.multiplier
         let tip = EffectGeometry.tip(c.target, in: size, flipped: false)
         let path = EffectGeometry.fillPath(c.target, in: size)
-        let light: NSColor = c.dark ? .white : c.color
+        // White specks show on the coloured fill in light and dark alike.
+        let light: NSColor = .white
         switch (c.style, c.target) {
         case (.off, _):
             return []
@@ -167,34 +168,36 @@ private enum EffectLayersBuilder {
                                          size: 4.5 * k, color: light, opacity: [0, 0.95, 0.95, 0], fade: -0.11))
             }
             result.append(sparks(at: tip, direction: back, spread: .pi / 4, rate: 55 * m, speed: 30 * k, gravity: 0,
-                                 life: 0.7, scale: 0.18 * k, colors: c.dark ? [.white, c.color] : [c.color], dark: c.dark))
+                                 life: 0.7, scale: 0.26 * k, colors: c.dark ? [.white, c.color] : [c.color], dark: c.dark))
             result.append(glow(at: tip, radius: 7 * k, color: c.color))
             return result
         case (.sparks, .line):
-            let big: CGFloat = size.height >= 6 ? 1.25 : 1
+            let big: CGFloat = size.height >= 6 ? 1.25 : 1.1
             let warm = NSColor(srgbRed: 1, green: 0.84, blue: 0.55, alpha: 1)
             return [sparks(at: tip, direction: .pi / 2 - 0.4, spread: .pi / 3, rate: 70 * m * Double(big), speed: 50 * big,
-                           gravity: 190, life: 0.5, scale: 0.13 * big, colors: c.dark ? [warm, c.color] : [c.color], dark: c.dark),
+                           gravity: 190, life: 0.5, scale: 0.2 * big, colors: c.dark ? [warm, c.color] : [c.color], dark: c.dark),
                     glow(at: tip, radius: 6 * big, color: warm)]
         case (.flow, .ring(_, let radius)):
             guard let path else { return [] }
-            let count = max(4, Int((12 * m).rounded()))
+            let count = max(5, Int((14 * m).rounded()))
             return [travellers(along: path, count: count, spacing: 2.9 / Double(count), period: 2.9, timing: .linear,
-                               size: 2.6 * radius / 18, color: light, opacity: [0, 0.9, 0], fade: 0)]
+                               size: 3.6 * radius / 18, color: light, opacity: [0, 1, 0], fade: 0),
+                    glow(at: tip, radius: 7 * radius / 18, color: c.color)]
         case (.flow, .line):
             guard let path else { return [] }
             let count = max(3, Int((6 * m).rounded()))
             return [travellers(along: path, count: count, spacing: 1.7 / Double(count), period: 1.7, timing: .linear,
-                               size: max(2, size.height * 0.65), color: .white, opacity: [0, 0.9, 0], fade: 0)]
+                               size: max(3.5, size.height * 0.9), color: .white, opacity: [0, 1, 0], fade: 0),
+                    glow(at: tip, radius: max(6, size.height * 1.5), color: c.color)]
         case (.shimmer, .ring(_, let radius)):
             let k = radius / 18
             var result: [CALayer] = []
             if let path {
                 result.append(travellers(along: path, count: 6, spacing: 0.04, period: 2.6, timing: .easeInEaseOut,
-                                         size: 4 * k, color: light, opacity: [0, 0.5, 0.5, 0], fade: -0.15))
+                                         size: 5 * k, color: light, opacity: [0, 0.75, 0.75, 0], fade: -0.15))
             }
             result.append(embers(around: CGPoint(x: size.width / 2, y: size.height / 2), radius: radius + 4 * k,
-                                 rate: 5 * m, k: k, color: c.color, dark: c.dark))
+                                 rate: 8 * m, k: k, color: c.color, dark: c.dark))
             return result
         case (.shimmer, .line(let fill)):
             let width = size.width * CGFloat(fill)
@@ -260,7 +263,7 @@ private enum EffectLayersBuilder {
         cell.velocityRange = 6 * k
         cell.emissionLongitude = .pi / 2
         cell.emissionRange = 0.3
-        cell.scale = 0.11 * k
+        cell.scale = 0.17 * k
         cell.alphaSpeed = -0.4
         cell.color = color.withAlphaComponent(0.8).cgColor
         emitter.emitterCells = [cell]
@@ -323,7 +326,7 @@ private enum EffectLayersBuilder {
         let band = CAGradientLayer()
         band.startPoint = CGPoint(x: 0, y: 0.5)
         band.endPoint = CGPoint(x: 1, y: 0.5)
-        band.colors = [NSColor.white.withAlphaComponent(0).cgColor, NSColor.white.withAlphaComponent(0.75).cgColor,
+        band.colors = [NSColor.white.withAlphaComponent(0).cgColor, NSColor.white.withAlphaComponent(0.95).cgColor,
                        NSColor.white.withAlphaComponent(0).cgColor]
         band.frame = CGRect(x: -24, y: 0, width: 24, height: height)
         let move = CABasicAnimation(keyPath: "position.x")
