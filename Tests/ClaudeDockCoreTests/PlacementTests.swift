@@ -238,3 +238,55 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         }
     }
 }
+
+/// The compact widget grows to the full one toward the middle of the screen.
+@Suite struct GrowthTests {
+    let full = CGSize(width: 497, height: 82)
+
+    func anchor(_ frame: CGRect, _ spot: WidgetSpot? = nil) -> GrowthAnchor {
+        WidgetPlacement.anchor(compact: frame, visible: visibleWithDock, spot: spot)
+    }
+
+    func grown(_ compact: CGRect, _ size: CGSize, _ spot: WidgetSpot? = nil, visible: CGRect = visibleWithDock) -> CGRect {
+        WidgetPlacement.expandedFrame(compact: compact, size: size,
+                                      anchor: WidgetPlacement.anchor(compact: compact, visible: visible, spot: spot),
+                                      screen: screen, visible: visible)
+    }
+
+    @Test func growsTowardTheMiddleOfTheScreen() {
+        #expect(anchor(CGRect(x: 2398, y: 6, width: 150, height: 82)) == GrowthAnchor(.right, .bottom))
+        #expect(anchor(CGRect(x: 12, y: 6, width: 150, height: 82)) == GrowthAnchor(.left, .bottom))
+        #expect(anchor(CGRect(x: 2398, y: 1346, width: 150, height: 82)) == GrowthAnchor(.right, .top))
+        #expect(anchor(CGRect(x: 12, y: 1346, width: 150, height: 82)) == GrowthAnchor(.left, .top))
+        #expect(anchor(CGRect(x: 900, y: 300, width: 150, height: 82), .free(WidgetOffset(right: 1510, bottom: 300)))
+                == GrowthAnchor(.left, .bottom))
+    }
+
+    @Test func sideStripsGrowFromTheirMiddle() {
+        let strip = CGRect(x: 2486, y: 685, width: 68, height: 160)
+        #expect(anchor(strip, .snapped(.rightMiddle)) == GrowthAnchor(.right, .center))
+        #expect(anchor(CGRect(x: 6, y: 685, width: 68, height: 160), .snapped(.leftMiddle)) == GrowthAnchor(.left, .center))
+        #expect(grown(strip, CGSize(width: 104, height: 300), .snapped(.rightMiddle))
+                == CGRect(x: 2450, y: 615, width: 104, height: 300))
+    }
+
+    @Test func keepsTheAnchoredEdgesInPlace() {
+        #expect(grown(CGRect(x: 2398, y: 6, width: 150, height: 82), full) == CGRect(x: 2051, y: 6, width: 497, height: 82))
+        #expect(grown(CGRect(x: 12, y: 1346, width: 150, height: 82), full) == CGRect(x: 12, y: 1346, width: 497, height: 82))
+        // A vertical strip in a bottom corner grows up from its bottom edge.
+        #expect(grown(CGRect(x: 12, y: 6, width: 68, height: 160), CGSize(width: 104, height: 300))
+                == CGRect(x: 12, y: 6, width: 104, height: 300))
+    }
+
+    @Test func staysOnScreenAndBelowTheMenuBar() {
+        let withMenuBar = CGRect(x: 0, y: 90, width: 2560, height: 1325)
+        // A strip centred near the top would reach under the menu bar: it moves down.
+        let high = CGRect(x: 2486, y: 1200, width: 68, height: 160)
+        let frame = grown(high, CGSize(width: 104, height: 300), .snapped(.rightMiddle), visible: withMenuBar)
+        #expect(frame == CGRect(x: 2450, y: 1115, width: 104, height: 300))
+        #expect(frame.contains(high))
+        // One centred near the bottom would go below the screen: it moves up.
+        let low = CGRect(x: 2486, y: 10, width: 68, height: 160)
+        #expect(grown(low, CGSize(width: 104, height: 300), .snapped(.rightMiddle)).minY == 0)
+    }
+}
