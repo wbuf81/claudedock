@@ -55,6 +55,19 @@ a real Mac, a real account, or a person. Tick what you checked and on what.
 - [ ] A 24-hour region (System Settings → General → Language & Region): times read "16:00".
 - [ ] Changing the time zone updates the times within a minute, without relaunching.
 
+## Compact and in use
+
+- [ ] Hover grows the widget and leaving shrinks it, with another app in front, over a
+      full-screen app, on every Position, and in the vertical strip.
+- [ ] Expanded beside the Dock, it draws over the Dock.
+- [ ] Click: the panel opens against the expanded widget, which stays expanded until the
+      panel closes.
+- [ ] Reduce Motion: the widget only crossfades, and an org in use shows a still glow.
+- [ ] Claude Code working: particles on its org within about 2 s, gone about 60 s after it
+      stops.
+- [ ] A desktop-app chat on the primary org: particles there within one poll (3 minutes).
+- [ ] Each In-use effect and amount: Activity Monitor shows Claude Dock near 0% CPU.
+
 ## When things go wrong
 
 - [ ] Wi-Fi off: within a refresh the panel says "Can't reach claude.ai", the widget greys

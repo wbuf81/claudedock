@@ -33,6 +33,7 @@ enum Showcase {
         let side = model(scenarios[0])
         side.vertical = true
         write(SideScene(model: side), size: CGSize(width: 1000, height: 820), scheme: .dark, to: dir, "vertical.png")
+        write(CompactScene(model: main), size: CGSize(width: 1180, height: 330), scheme: .dark, to: dir, "compact.png")
         try? FileManager.default.removeItem(at: history)
         print("Showcase written to \(dir.path)")
     }
@@ -166,6 +167,34 @@ private struct DesktopScene: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 12)
             .padding(.bottom, 6)
+        }
+    }
+}
+
+/// The bottom-right of a desktop twice: the compact widget beside the Dock, and the full
+/// widget it grows to when the pointer rests on it.
+private struct CompactScene: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Wallpaper(dark: true)
+            VStack(spacing: 40) {
+                row(compact: true)
+                row(compact: false)
+            }
+            .padding(.vertical, 30)
+        }
+    }
+
+    private func row(compact: Bool) -> some View {
+        ZStack {
+            FakeDock()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, -160)
+            WidgetView(model: model, actions: .none, compact: compact).fixedSize()
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
         }
     }
 }

@@ -1,7 +1,6 @@
 # Compact widget and in-use particles: design
 
-Date: 2026-10-07. Status: design agreed in brainstorming (mockups in the visual companion),
-awaiting spec review.
+Date: 2026-10-07. Status: approved and implemented (plan: docs/superpowers/plans/2026-10-07-compact-widget.md).
 
 ## Goal
 
