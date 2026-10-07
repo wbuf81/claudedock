@@ -21,6 +21,9 @@ final class Settings: ObservableObject {
     @Published var sizeScale: Double { didSet { defaults.set(sizeScale, forKey: "sizeScale") } }
     /// Shrinks the widget to each org's ring, name and 5-hour line until the pointer rests on it.
     @Published var compact: Bool { didSet { defaults.set(compact, forKey: "compact") } }
+    /// How an org that's in use shows it, and how many particles.
+    @Published var effectStyle: EffectStyle { didSet { defaults.set(effectStyle.rawValue, forKey: "effectStyle") } }
+    @Published var effectAmount: EffectAmount { didSet { defaults.set(effectAmount.rawValue, forKey: "effectAmount") } }
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
@@ -40,6 +43,8 @@ final class Settings: ObservableObject {
         layoutChoice = LayoutChoice(rawValue: defaults.string(forKey: "layoutChoice") ?? "") ?? .automatic
         sizeScale = WidgetLayout.clampSize(defaults.object(forKey: "sizeScale") as? Double ?? 1)
         compact = defaults.object(forKey: "compact") as? Bool ?? true
+        effectStyle = EffectStyle(rawValue: defaults.string(forKey: "effectStyle") ?? "") ?? .flow
+        effectAmount = EffectAmount(rawValue: defaults.string(forKey: "effectAmount") ?? "") ?? .normal
         // Save the migration once; otherwise it would rerun on every launch against whatever
         // orgs are known by then, hiding any joined since.
         if defaults.object(forKey: "shownOrgs") != nil {

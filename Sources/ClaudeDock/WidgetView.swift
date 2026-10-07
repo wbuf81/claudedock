@@ -167,6 +167,15 @@ struct WidgetView: View {
             }
         }
         check("Shrink until hovered", settings.compact) { actions.compact(!settings.compact) }
+        Menu("In-use effect") {
+            ForEach(EffectStyle.allCases, id: \.self) { style in
+                check(Self.title(style), settings.effectStyle == style) { actions.effect(style) }
+            }
+            Divider()
+            ForEach(EffectAmount.allCases, id: \.self) { amount in
+                check(Self.title(amount), settings.effectAmount == amount) { actions.amount(amount) }
+            }
+        }
         Button("Hide for 1 hour", action: actions.hide)
         Button("Settings…", action: actions.settings)
         Button(model.signedIn ? "Sign out" : "Sign in…", action: actions.signInOut)
@@ -181,6 +190,23 @@ struct WidgetView: View {
     }
 
     static let sizes: [(String, Double)] = [("Small", 0.8), ("Match Dock", 1), ("Large", 1.25), ("Extra large", 1.5)]
+
+    static func title(_ style: EffectStyle) -> String {
+        switch style {
+        case .sparks: "Sparks"
+        case .flow: "Flow"
+        case .shimmer: "Shimmer"
+        case .off: "Off"
+        }
+    }
+
+    static func title(_ amount: EffectAmount) -> String {
+        switch amount {
+        case .subtle: "Subtle"
+        case .normal: "Normal"
+        case .lots: "Lots"
+        }
+    }
 
     static func title(_ point: SnapPoint) -> String {
         switch point {
@@ -216,8 +242,10 @@ private struct OrgBlock: View {
         let reading = model.reading(for: org)
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow
-        let ring = WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
-                            color: light == .red ? Palette.crit : Palette.accent, size: 48 * k)
+        let inUse = model.inUse(for: org)
+        let ringColor = light == .red ? Palette.crit : Palette.accent
+        let ring = WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0, color: ringColor, size: 48 * k)
+            .inUseEffect(inUse, .ring(fill: (reading?.week ?? 0) / 100, radius: 18 * k), settings: model.settings, color: ringColor)
         let name = HStack(spacing: 6 * k) {
             Text(org.name)
                 .font(.system(size: max(13 * k, 11), weight: .semibold))
@@ -228,6 +256,7 @@ private struct OrgBlock: View {
         }
         let bar = UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
                            color: Palette.accent, height: 6 * k)
+            .inUseEffect(inUse, .line(fill: (reading?.session ?? 0) / 100), settings: model.settings, color: Palette.accent)
         // An org that stopped reading says why, and dims unless the whole widget already has.
         let caption = model.orgProblems[org.id]?.short
             ?? reading.map { Copy.widgetSubline($0, now: model.now, formatting: model.formatting) } ?? "no reading yet"
@@ -277,11 +306,13 @@ private struct CompactOrg: View {
         let reading = model.reading(for: org)
         let forecast = model.forecast(for: org)
         let light = model.light(for: org) ?? .yellow
+        let inUse = model.inUse(for: org)
+        let ringColor = light == .red ? Palette.crit : Palette.accent
         let summary = Copy.widgetSummary(org.name, reading, light: model.light(for: org),
                                          forecast: forecast, now: model.now, formatting: model.formatting)
         VStack(spacing: 3 * k) {
-            WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0,
-                     color: light == .red ? Palette.crit : Palette.accent, size: 44 * k)
+            WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0, color: ringColor, size: 44 * k)
+                .inUseEffect(inUse, .ring(fill: (reading?.week ?? 0) / 100, radius: 16.5 * k), settings: model.settings, color: ringColor)
                 .overlay(alignment: .topTrailing) {
                     // A rim in the glass's colour keeps the dot readable on top of the ring.
                     StoplightDot(light: light, size: 9 * k)
@@ -296,6 +327,7 @@ private struct CompactOrg: View {
                 .frame(maxWidth: 54 * k)
             UsageBar(used: reading?.session ?? 0, tick: reading?.sessionElapsedFraction(now: model.now),
                      color: Palette.accent, height: 4 * k)
+                .inUseEffect(inUse, .line(fill: (reading?.session ?? 0) / 100), settings: model.settings, color: Palette.accent)
                 .frame(width: 46 * k)
         }
         .frame(width: 56 * k)

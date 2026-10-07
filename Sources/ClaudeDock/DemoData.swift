@@ -8,6 +8,8 @@ struct DemoScenario {
     var primary: String
     var readings: [Reading]
     var claudeCodeOrg: String
+    /// Claude Code is working on `claudeCodeOrg`, so it shows the in-use effect.
+    var claudeCodeWorking = false
     var now: Date
 }
 
@@ -28,16 +30,16 @@ enum DemoData {
             Reading(time: now, org: org.id, session: session, sessionResetsAt: sessionReset.map(at),
                     week: week, weekResetsAt: weekReset.map(onTheHour), scoped: ["Fable": fable])
         }
-        func scenario(_ name: String, _ readings: [Reading]) -> DemoScenario {
+        func scenario(_ name: String, working: Bool = false, _ readings: [Reading]) -> DemoScenario {
             DemoScenario(name: name, orgs: [pikachu, charizard], primary: pikachu.id,
-                         readings: readings, claudeCodeOrg: pikachu.id, now: now)
+                         readings: readings, claudeCodeOrg: pikachu.id, claudeCodeWorking: working, now: now)
         }
         return [
             scenario("green-and-red", [
                 r(pikachu, week: 55, weekReset: 64.5, session: 1, sessionReset: 4.8, fable: 31),
                 r(charizard, week: 95, weekReset: 33.5, fable: 2),
             ]),
-            scenario("switch-for-desktop-app", [
+            scenario("switch-for-desktop-app", working: true, [
                 r(pikachu, week: 60, weekReset: 64.5, session: 85, sessionReset: 1.5),
                 r(charizard, week: 40, weekReset: 40),
             ]),
