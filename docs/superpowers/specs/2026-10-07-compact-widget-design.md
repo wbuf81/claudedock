@@ -96,10 +96,11 @@ An org is **in use** when either is true:
    signed into this org. The app watches that folder with FSEvents (file-level events,
    about 1 s latency) and records only *that* a `.jsonl` file changed. It never opens or
    reads those files.
-2. **Its usage just rose**: the org's newest reading shows its 5-hour % higher than its
-   previous reading with the same 5-hour reset time, or its weekly % higher than its
-   previous reading with the same weekly reset time (so a reset is never a rise), and the
-   newest reading is under 4 minutes old. This catches the desktop app and claude.ai in a
+2. **Its usage just rose**: compared with the org's previous reading (taken no more than
+   10 minutes earlier), its 5-hour % or weekly % went up within the same window (reset
+   times within 60 s of each other), or a new window already shows some use (windows open
+   on first use). A reset to nothing is not a rise. It counts while the newest reading is
+   under 4 minutes old. This catches the desktop app and claude.ai in a
    browser, up to one poll (3 minutes) late.
 
 No particles while the widget is stale (signed out, or no reading for 10 minutes).
