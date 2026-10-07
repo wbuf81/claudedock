@@ -1,14 +1,9 @@
 import Foundation
 
-/// How fast a green dot pulses, in seconds per pulse.
-public enum Pulse: Double, Equatable, Sendable {
-    case slow = 2.8, normal = 1.6, fast = 0.9
-}
-
-/// "Should I be using this org right now?" Green (with a pulse, or steady when the week
-/// hasn't started), yellow, or red.
+/// "Should I be using this org right now?" Green (tokens would go unused), yellow (on
+/// pace) or red (nearly out).
 public enum Light: Equatable, Sendable {
-    case green(Pulse?)
+    case green
     case yellow
     case red
 }
@@ -20,8 +15,6 @@ public struct Thresholds: Codable, Equatable, Sendable {
     public var redSession = 95.0
     public var yellowSession = 80.0
     public var onPaceUnused = 5.0
-    public var normalPulseUnused = 10.0
-    public var fastPulseUnused = 25.0
     public var eligibleWeekLeft = 10.0
     public var eligibleSessionBelow = 80.0
     public var primaryReserveWeekLeft = 15.0
@@ -37,13 +30,11 @@ public enum Stoplight {
             return .red
         }
         guard let forecast else {
-            return reading.session >= t.yellowSession ? .yellow : .green(nil)
+            return reading.session >= t.yellowSession ? .yellow : .green
         }
         if reading.session >= t.yellowSession || forecast.unused < t.onPaceUnused || forecast.runsOutEarlyByHours != nil {
             return .yellow
         }
-        if forecast.unused > t.fastPulseUnused { return .green(.fast) }
-        if forecast.unused >= t.normalPulseUnused { return .green(.normal) }
-        return .green(.slow)
+        return .green
     }
 }

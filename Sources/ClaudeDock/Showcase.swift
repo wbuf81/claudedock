@@ -39,11 +39,11 @@ enum Showcase {
 
     /// One line per demo scenario, in `DemoData.scenarios` order.
     static let captions = [
-        "Pikachu is green and pulsing: tokens would go unused. Charizard is nearly out.",
+        "Pikachu is green: tokens would go unused. Charizard is nearly out.",
         "Pikachu's 5-hour window is busy, so move Claude Code to Charizard and leave room for the desktop app.",
         "Charizard's week resets first, so use it before it expires.",
         "Both are low: Charizard is back first.",
-        "Pikachu is on pace (yellow) but down to its last 12%, so Charizard, whose week hasn't started (steady green), goes first.",
+        "Pikachu is on pace (yellow) but down to its last 12%, so Charizard, whose week hasn't started, goes first.",
     ]
 
     /// `--matrix DIR`: the widget across org counts, name lengths, layouts and sizes, and the

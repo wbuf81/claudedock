@@ -58,26 +58,13 @@ struct UsageBar: View {
     }
 }
 
-/// The stoplight dot. Green pulses (faster when more would go unused) unless Reduce Motion is on.
+/// The stoplight dot. Steady: an org that's in use gets particles instead (`InUseEffect`).
 struct StoplightDot: View {
     var light: Light
     var size: CGFloat = 9
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.renderStyle) private var renderStyle
 
     var body: some View {
-        let color = Palette.color(for: light)
-        Circle().fill(color).frame(width: size, height: size)
-            .overlay {
-                if case .green(let pulse?) = light, !reduceMotion {
-                    if renderStyle == .live {
-                        PulseRing(color: NSColor(color), period: pulse.rawValue).frame(width: size, height: size)
-                    } else {
-                        // Image rendering can't draw the Core Animation ring; show it mid-pulse.
-                        Circle().stroke(color.opacity(0.45), lineWidth: 2).scaleEffect(1.5)
-                    }
-                }
-            }
+        Circle().fill(Palette.color(for: light)).frame(width: size, height: size)
             .accessibilityLabel(label)
     }
 
@@ -87,54 +74,6 @@ struct StoplightDot: View {
         case .yellow: "On pace"
         case .red: "Nearly out"
         }
-    }
-}
-
-/// The pulsing ring around a green dot, animated by Core Animation in the window server so
-/// the app does no per-frame work. (A SwiftUI animation here re-laid out the whole widget on
-/// every frame, about 5% CPU all day; `@State` animations also can't compile with the macOS 27
-/// SDK on the Command Line Tools.) `--render` shows the dot without the ring.
-private struct PulseRing: NSViewRepresentable {
-    var color: NSColor
-    var period: Double
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 9, height: 9))
-        view.wantsLayer = true
-        let ring = CAShapeLayer()
-        ring.frame = view.bounds
-        ring.path = CGPath(ellipseIn: view.bounds.insetBy(dx: 1, dy: 1), transform: nil)
-        ring.fillColor = nil
-        ring.lineWidth = 2
-        view.layer?.addSublayer(ring)
-        configure(ring)
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {
-        if let ring = view.layer?.sublayers?.first as? CAShapeLayer { configure(ring, in: view) }
-    }
-
-    private func configure(_ ring: CAShapeLayer, in view: NSView? = nil) {
-        if let view, ring.frame != view.bounds {
-            ring.frame = view.bounds
-            ring.path = CGPath(ellipseIn: view.bounds.insetBy(dx: 1, dy: 1), transform: nil)
-        }
-        ring.strokeColor = color.cgColor
-        if ring.animation(forKey: "pulse")?.duration == period { return }
-        let grow = CABasicAnimation(keyPath: "transform.scale")
-        grow.fromValue = 1
-        grow.toValue = 2.4
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0.8
-        fade.toValue = 0
-        let pulse = CAAnimationGroup()
-        pulse.animations = [grow, fade]
-        pulse.duration = period
-        pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        pulse.repeatCount = .infinity
-        pulse.isRemovedOnCompletion = false
-        ring.add(pulse, forKey: "pulse")
     }
 }
 
