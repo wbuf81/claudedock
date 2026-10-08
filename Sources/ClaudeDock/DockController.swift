@@ -4,8 +4,9 @@ import SwiftUI
 import ClaudeDockCore
 
 /// Owns the two floating windows: the always-on widget and the panel it opens. The widget
-/// window holds the compact and the full widget. In compact mode it shows the compact one
-/// and grows to the full one while the pointer rests on it or the panel is open.
+/// window holds the compact and the full widget and shows one of them: the owner's choice,
+/// switched from the Size menu or by dragging the widget's inner edge. Each is drawn with a
+/// clear band on the crab's side, so the window is the glass plus that band.
 @MainActor
 final class DockController {
     var onPanelOpened: (() -> Void)?
@@ -26,13 +27,14 @@ final class DockController {
     /// The owner scale the widget is drawn at now, after fitting it on screen.
     private var appliedScale: Double = 1
     private var settingsChanges: AnyCancellable?
-    /// Where the compact and the full widget go, and the edges the widget grows from. With
-    /// compact mode off, both are the full widget's frame.
+    /// Where the glass of the compact and of the full widget goes, and the edges the widget
+    /// grows from. The window is each glass plus the crab's band (`windowFrame`).
     private var frames: (compact: NSRect, full: NSRect, anchor: GrowthAnchor)?
-    /// Compact mode is showing the full widget: the pointer rests on it, or the panel is open.
-    private var expanded = false
-    private var pointerInside = false
-    private var hoverWork: DispatchWorkItem?
+    /// The glass of the size shown, at rest: what moving and snapping go by.
+    private var glassFrame = NSRect.zero
+    /// Where a resize drag started: the window frames of both sizes and the progress then.
+    private var resizeStart: (compact: NSRect, full: NSRect, progress: CGFloat)?
+    private var showingFull: Bool { !model.settings.compact }
     /// Counts grow and shrink animations, so one that was overtaken finishes quietly.
     private var generation = 0
     private var animating = false
@@ -61,7 +63,7 @@ final class DockController {
         scroll.contentView.drawsBackground = false
         scroll.borderType = .noBorder
         panel.contentView = scroll
-        container.onHover = { [weak self] inside in self?.pointerMoved(inside: inside) }
+        container.onResize = { [weak self] phase in self?.resize(phase) }
         changes = model.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.layout() } }
         }
@@ -87,8 +89,7 @@ final class DockController {
     }
 
     func hide(for seconds: TimeInterval) {
-        hoverWork?.cancel()
-        expanded = false
+        resizeStart = nil
         closePanel()
         widget.orderOut(nil)
         let until = Date().addingTimeInterval(seconds)
@@ -102,8 +103,6 @@ final class DockController {
 
     func openPanel() {
         guard !panel.isVisible else { return }
-        hoverWork?.cancel()
-        setExpanded(true)
         placePanel()
         panelContent.scroll(.zero)
         panel.orderFrontRegardless()
@@ -123,17 +122,14 @@ final class DockController {
         panel.orderOut(nil)
         monitors.forEach(NSEvent.removeMonitor)
         monitors.removeAll()
-        // The widget stayed full size for the panel: shrink it unless the pointer is on it.
-        recheckPointer()
     }
 
     /// Moves the widget with the mouse. Screen coordinates, so the window moving under the
-    /// pointer doesn't disturb the drag. In compact mode the compact widget is what moves.
+    /// pointer doesn't disturb the drag.
     func dragChanged() {
         let mouse = NSEvent.mouseLocation
         if dragStart == nil {
-            hoverWork?.cancel()
-            collapseForDrag()
+            settleNow()
             dragStart = (mouse, widget.frame.origin)
             closePanel()
         }
@@ -143,14 +139,22 @@ final class DockController {
 
     /// Near one of the six snap points the widget snaps there; anywhere else it stays put.
     func dragEnded() {
+        guard let start = dragStart else { return }
         dragStart = nil
-        guard let screen = NSScreen.screens.first else { return }
-        if let point = WidgetPlacement.snap(frame: widget.frame, screen: screen.frame, visible: screen.visibleFrame,
+        guard let screen = NSScreen.screens.first, let frames else { return }
+        // The glass, moved as far as the window was.
+        let glass = glassFrame.offsetBy(dx: widget.frame.minX - start.origin.x, dy: widget.frame.minY - start.origin.y)
+        if let point = WidgetPlacement.snap(frame: glass, screen: screen.frame, visible: screen.visibleFrame,
                                             dockWidth: Self.dockWidth(on: screen)) {
             model.settings.widgetSpot = .snapped(point)
         } else {
-            model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: widget.frame.origin, size: widget.frame.size,
-                                                                     screen: screen.frame))
+            // The saved spot is the compact widget's: when the full one is shown, the compact
+            // one lands where the full one grew from.
+            let spot = showingFull
+                ? WidgetPlacement.compactFrame(full: glass, size: frames.compact.size,
+                                               anchor: WidgetPlacement.anchor(compact: glass, visible: screen.visibleFrame, spot: nil))
+                : glass
+            model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: spot.origin, size: spot.size, screen: screen.frame))
         }
         layout()
     }
@@ -158,33 +162,23 @@ final class DockController {
     func place(_ point: SnapPoint) {
         model.settings.widgetSpot = .snapped(point)
         layout()
-        recheckPointerSoon()
     }
 
     func setLayout(_ choice: LayoutChoice) {
         model.settings.layoutChoice = choice
         layout()
-        recheckPointerSoon()
     }
 
     func setSize(_ scale: Double) {
         model.settings.sizeScale = WidgetLayout.clampSize(scale)
         layout()
-        recheckPointerSoon()
     }
 
+    /// Shows the compact (true) or the full (false) widget, growing or shrinking to it.
     func setCompact(_ on: Bool) {
-        hoverWork?.cancel()
-        expanded = false
+        settleNow()
         model.settings.compact = on
-        layout()
-        // The panel keeps the widget full size; otherwise grow if the pointer is resting on it.
-        if on && panel.isVisible {
-            setExpanded(true)
-            placePanel()
-        } else {
-            recheckPointerSoon()
-        }
+        animateSettle(from: widget.frame)
     }
 
     /// Resizes live while pinching, and keeps the size when the pinch ends.
@@ -192,56 +186,73 @@ final class DockController {
         if ended {
             pinchFactor = 1
             model.settings.sizeScale = WidgetLayout.clampSize(model.settings.sizeScale * magnification)
-            recheckPointerSoon()
         } else {
             pinchFactor = WidgetLayout.clampSize(model.settings.sizeScale * magnification) / model.settings.sizeScale
         }
         layout()
     }
 
-    // MARK: Growing and shrinking
+    // MARK: Resizing
 
-    /// The pointer came onto the widget or left it. In compact mode the widget grows once
-    /// the pointer has rested on it for 0.25 s, and shrinks 0.4 s after it leaves (not while
-    /// the panel is open).
-    private func pointerMoved(inside: Bool) {
-        pointerInside = inside
-        hoverWork?.cancel()
-        guard model.settings.compact, dragStart == nil, inside != expanded, inside || !panel.isVisible else { return }
-        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.setExpanded(inside) } }
-        hoverWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (inside ? 0.25 : 0.4), execute: work)
+    /// A drag on the inner edge. Pulling it toward the middle of the screen grows the widget:
+    /// the window's frame and the crossfade between the two sizes follow the pointer. On
+    /// release, past halfway is full and short of it is compact.
+    private func resize(_ phase: ResizePhase) {
+        guard let frames else { return }
+        switch phase {
+        case .began:
+            settleNow()
+            resizeStart = (windowFrame(frames.compact), windowFrame(frames.full), showingFull ? 1 : 0)
+            fullHost.isHidden = false
+            compactHost.isHidden = false
+            widget.level = Self.aboveDock
+        case .moved(let dx, _):
+            guard let start = resizeStart else { return }
+            let span = max(start.full.width - start.compact.width, 1)
+            let pull = frames.anchor.horizontal == .right ? -dx : dx
+            let progress = min(max(start.progress + pull / span, 0), 1)
+            setResize(progress, frames: frames)
+        case .ended:
+            guard let start = resizeStart else { return }
+            resizeStart = nil
+            let progress = fullHost.alphaValue
+            model.settings.compact = progress < 0.5   // triggers layout() via the settings sink
+            animateSettle(from: Self.lerp(start.compact, start.full, progress))
+        }
     }
 
-    /// After the widget moves, changes size or the panel closes, the pointer may be
-    /// somewhere else without an enter or exit event to say so.
-    private func recheckPointer() {
-        pointerMoved(inside: widget.isVisible && widget.frame.contains(NSEvent.mouseLocation))
+    private func setResize(_ progress: CGFloat, frames: (compact: NSRect, full: NSRect, anchor: GrowthAnchor)) {
+        let window = Self.lerp(windowFrame(frames.compact), windowFrame(frames.full), progress)
+        widget.setFrame(window, display: true)
+        fullHost.alphaValue = progress
+        compactHost.alphaValue = 1 - progress
+        placeHandle(glass: Self.lerp(frames.compact, frames.full, progress), in: window)
+        if panel.isVisible { placePanel() }
     }
 
-    /// The same, once a layout queued by a settings change has moved or resized the widget.
-    private func recheckPointerSoon() {
-        DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.recheckPointer() } }
+    private static func lerp(_ a: NSRect, _ b: NSRect, _ t: CGFloat) -> NSRect {
+        NSRect(x: a.minX + (b.minX - a.minX) * t, y: a.minY + (b.minY - a.minY) * t,
+               width: a.width + (b.width - a.width) * t, height: a.height + (b.height - a.height) * t)
     }
 
-    /// Grows to the full widget or shrinks back to the compact one: the window's frame
-    /// animates while the two crossfade. With Reduce Motion only the crossfade runs: the
-    /// window grows before it, and shrinks after it (in `layout`).
-    private func setExpanded(_ expand: Bool) {
-        guard model.settings.compact, expand != expanded, dragStart == nil, let frames else { return }
-        expanded = expand
+    /// Animates to the size the setting names: the window's frame changes while the two
+    /// crossfade. With Reduce Motion only the crossfade runs: the window grows before it, and
+    /// shrinks after it (in `layout`).
+    private func animateSettle(from start: NSRect) {
+        guard let frames else { return }
         generation += 1
         let current = generation
-        let target = expand ? frames.full : frames.compact
-        let incoming = expand ? fullHost : compactHost
-        let outgoing = expand ? compactHost : fullHost
+        let growing = showingFull
+        let target = windowFrame(growing ? frames.full : frames.compact)
+        let incoming = growing ? fullHost : compactHost
+        let outgoing = growing ? compactHost : fullHost
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        if expand { widget.level = Self.aboveDock }
+        if growing { widget.level = Self.aboveDock }
         incoming.isHidden = false
+        outgoing.isHidden = false
         animating = true
-        // Clip both widgets to the window's rounded shape while it changes size.
-        container.layer?.masksToBounds = true
-        if reduceMotion, expand { widget.setFrame(target, display: true) }
+        if widget.frame != start { widget.setFrame(start, display: true) }
+        if reduceMotion, growing { widget.setFrame(target, display: true) }
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = reduceMotion ? 0.2 : 0.22
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -252,38 +263,40 @@ final class DockController {
             MainActor.assumeIsolated {
                 guard let self, self.generation == current else { return }
                 self.animating = false
-                self.container.layer?.masksToBounds = false
                 self.layout()  // settles the frame, hides the faded widget, sets the level
-                self.recheckPointer()
             }
         })
     }
 
-    /// A drag moves the compact widget: drop to it at once, overriding any animation under
-    /// way. The full widget stays in the window, transparent, until the drag ends, so a drag
-    /// that started on it keeps getting events.
-    private func collapseForDrag() {
-        guard model.settings.compact, expanded || animating, let frames else { return }
+    /// Cuts any animation short and puts the widget at rest at the size the setting names, so
+    /// a drag starts from a settled window.
+    private func settleNow() {
+        guard animating else { return }
         generation += 1
         animating = false
-        expanded = false
-        container.layer?.masksToBounds = false
-        widget.level = .floating
-        compactHost.isHidden = false
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0
-            widget.animator().setFrame(frames.compact, display: true)
-            compactHost.animator().alphaValue = 1
-            fullHost.animator().alphaValue = 0
+        if let frames {
+            let target = windowFrame(showingFull ? frames.full : frames.compact)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                widget.animator().setFrame(target, display: true)
+                fullHost.animator().alphaValue = showingFull ? 1 : 0
+                compactHost.animator().alphaValue = showingFull ? 0 : 1
+            }
         }
+        layout()
+    }
+
+    /// The window for a glass frame: the glass plus the crab's band.
+    private func windowFrame(_ glass: NSRect) -> NSRect {
+        WidgetPlacement.withCrabBand(glass, edge: model.crabEdge, depth: model.crabDepth)
     }
 
     // MARK: Layout
 
     /// Sizes the widget to the Dock bar and places it on the primary display (the one with the
     /// menu bar; `NSScreen.main` follows keyboard focus between displays): where the owner
-    /// dragged it, or the bottom-right corner beside the Dock. In compact mode the compact
-    /// widget is placed and the full one grows out of it.
+    /// dragged it, or the bottom-right corner beside the Dock. The compact widget is placed and
+    /// the full one grows out of it. All frames here are the glass; the window adds the band.
     private func layout() {
         guard let screen = NSScreen.screens.first else { return }
         let settings = model.settings
@@ -304,29 +317,42 @@ final class DockController {
             appliedScale = ownerScale
             return
         }
-        guard dragStart == nil, !animating else { return }
-        let full = fullHost.fittingSize
-        let compactSize = settings.compact ? compactHost.fittingSize : full
+        guard dragStart == nil, resizeStart == nil, !animating else { return }
+        let full = glassSize(fullHost), compactSize = glassSize(compactHost)
         let origin = WidgetPlacement.origin(size: compactSize, screen: screen.frame, visible: screen.visibleFrame,
                                             spot: settings.widgetSpot, dockWidth: Self.dockWidth(on: screen))
         let compact = NSRect(origin: origin, size: compactSize)
         let anchor = WidgetPlacement.anchor(compact: compact, visible: screen.visibleFrame, spot: settings.widgetSpot)
-        let grown = settings.compact
-            ? WidgetPlacement.expandedFrame(compact: compact, size: full, anchor: anchor,
-                                            screen: screen.frame, visible: screen.visibleFrame)
-            : compact
+        let grown = WidgetPlacement.expandedFrame(compact: compact, size: full, anchor: anchor,
+                                                  screen: screen.frame, visible: screen.visibleFrame)
+        // The crab perches on the side facing the middle of the screen; the hosts re-measure
+        // with the band on that side before the window is sized.
+        let edge = WidgetPlacement.crabEdge(anchor: anchor, vertical: vertical)
+        if model.crabEdge != edge {
+            model.crabEdge = edge
+            return
+        }
         frames = (compact, grown, anchor)
-        if !settings.compact { expanded = false }
-        let showFull = !settings.compact || expanded
-        let frame = showFull ? grown : compact
+        let showFull = showingFull
+        let frame = windowFrame(showFull ? grown : compact)
         if frame != widget.frame { widget.setFrame(frame, display: false) }
         arrange(in: frame)
         compactHost.isHidden = showFull
         compactHost.alphaValue = showFull ? 0 : 1
         fullHost.isHidden = !showFull
         fullHost.alphaValue = showFull ? 1 : 0
-        widget.level = settings.compact && expanded ? Self.aboveDock : .floating
+        widget.level = showFull ? Self.aboveDock : .floating
         if panel.isVisible { placePanel() }
+    }
+
+    /// The glass of a host: its fitting size less the crab's band.
+    private func glassSize(_ host: NSHostingView<WidgetView>) -> CGSize {
+        var size = host.fittingSize
+        switch model.crabEdge {
+        case .top, .bottom: size.height -= model.crabDepth
+        case .left, .right: size.width -= model.crabDepth
+        }
+        return size
     }
 
     /// Puts each widget at its own place inside a window at `frame`, pinned to the edges the
@@ -339,11 +365,21 @@ final class DockController {
         case .top: pin.insert(.minYMargin)
         case .center: pin.formUnion([.minYMargin, .maxYMargin])
         }
-        for (host, place) in [(compactHost, frames.compact), (fullHost, frames.full)] {
+        for (host, glass) in [(compactHost, frames.compact), (fullHost, frames.full)] {
             host.autoresizingMask = pin
-            host.frame = place.offsetBy(dx: -frame.minX, dy: -frame.minY)
+            host.frame = windowFrame(glass).offsetBy(dx: -frame.minX, dy: -frame.minY)
         }
-        container.layer?.cornerRadius = model.vertical ? 22 * model.widgetScale : model.widgetHeight * 0.27
+        glassFrame = showingFull ? frames.full : frames.compact
+        placeHandle(glass: glassFrame, in: frame)
+    }
+
+    /// Puts the resize handle along the glass's inner edge (the side facing the middle of the
+    /// screen), the glass's full height, and clear of the crab's band.
+    private func placeHandle(glass: NSRect, in window: NSRect) {
+        guard let frames else { return }
+        let width: CGFloat = 6
+        let x = frames.anchor.horizontal == .right ? glass.minX : glass.maxX - width
+        container.handleFrame = NSRect(x: x - window.minX, y: glass.minY - window.minY, width: width, height: glass.height)
     }
 
     /// The Dock's estimated width, from its settings and the apps running now.
@@ -368,7 +404,7 @@ final class DockController {
         let size = panelContent.fittingSize
         if panelContent.frame.size != size { panelContent.frame = NSRect(origin: .zero, size: size) }
         // Against where the widget is going, not where an animation has it right now.
-        let resting = frames.map { expanded || !model.settings.compact ? $0.full : $0.compact } ?? widget.frame
+        let resting = frames.map { showingFull ? $0.full : $0.compact } ?? glassFrame
         panel.setFrame(WidgetPlacement.panelFrame(panel: size, widget: resting, visible: screen.visibleFrame),
                        display: true)
     }

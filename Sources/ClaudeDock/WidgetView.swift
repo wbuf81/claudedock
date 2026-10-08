@@ -3,7 +3,7 @@ import ClaudeDockCore
 
 /// The always-on widget: one block per org, plus a switch tab when there's advice. A
 /// horizontal bar as tall as the Dock, or a narrow vertical strip on the left and right
-/// edges; in compact mode each org shrinks to its ring, name and 5-hour line. Contents
+/// edges; the compact widget shows each org as its ring, name and 5-hour line. Contents
 /// scale with the Dock's icon size and the owner's size setting.
 struct WidgetView: View {
     @ObservedObject var model: AppModel
@@ -193,12 +193,14 @@ struct WidgetView: View {
             ForEach(Self.sizes, id: \.1) { name, scale in
                 check(name, abs(settings.sizeScale - scale) < 0.01) { actions.size(scale) }
             }
+            Divider()
+            check("Compact", settings.compact) { actions.compact(true) }
+            check("Full", !settings.compact) { actions.compact(false) }
         }
         check("Show the crab", settings.showCrab) { actions.showCrab(!settings.showCrab) }
         Button(model.hooksConnected ? "Disconnect from Claude Code" : "Connect to Claude Code…") {
             actions.connectHooks(!model.hooksConnected)
         }
-        check("Shrink until hovered", settings.compact) { actions.compact(!settings.compact) }
         Menu("In-use effect") {
             ForEach(EffectStyle.allCases, id: \.self) { style in
                 check(Self.title(style), settings.effectStyle == style) { actions.effect(style) }

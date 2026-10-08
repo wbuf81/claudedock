@@ -19,7 +19,7 @@ final class Settings: ObservableObject {
     @Published var layoutChoice: LayoutChoice { didSet { defaults.set(layoutChoice.rawValue, forKey: "layoutChoice") } }
     /// A multiple of the Dock-matched size, 0.6...2.
     @Published var sizeScale: Double { didSet { defaults.set(sizeScale, forKey: "sizeScale") } }
-    /// Shrinks the widget to each org's ring, name and 5-hour line until the pointer rests on it.
+    /// Shows the compact widget (each org's ring, name and 5-hour line) instead of the full one.
     @Published var compact: Bool { didSet { defaults.set(compact, forKey: "compact") } }
     /// How an org that's in use shows it, and how many particles.
     @Published var effectStyle: EffectStyle { didSet { defaults.set(effectStyle.rawValue, forKey: "effectStyle") } }
