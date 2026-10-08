@@ -51,7 +51,7 @@ final class CrabSessions: @unchecked Sendable {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         var sessions: [CrabSession] = []
         for name in names {
-            guard let pid = Int32(name) else { continue }   // skips "<pid>.<n>.tmp"
+            guard let pid = Int32(name), pid > 0 else { continue }   // skips "<pid>.<n>.tmp"
             let url = folder.appendingPathComponent(name)
             guard Self.isAlive(pid) else { try? FileManager.default.removeItem(at: url); continue }
             if let text = try? String(contentsOf: url, encoding: .utf8), let session = Crab.parse(text, pid: pid) {

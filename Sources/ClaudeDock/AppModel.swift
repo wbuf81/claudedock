@@ -93,9 +93,9 @@ final class AppModel: ObservableObject {
     func crabMood(for org: Org) -> CrabMood? {
         guard settings.showCrab, !isStale, org.id == claudeCodeOrg else { return nil }
         if showingDemo { return demoCrab }
-        return hooksConnected
-            ? Crab.mood(crabSessions, isAlive: CrabSessions.isAlive, now: now)
-            : Crab.fallbackMood(claudeCodeActiveAt: claudeCodeActiveAt, now: now)
+        guard hooksConnected else { return Crab.fallbackMood(claudeCodeActiveAt: claudeCodeActiveAt, now: now) }
+        return Crab.settle(Crab.mood(crabSessions, isAlive: CrabSessions.isAlive, now: now),
+                           sessions: crabSessions, claudeCodeActiveAt: claudeCodeActiveAt, now: now)
     }
 
     /// Whether an org is being used right now; it gets the in-use effect. Claude Code's own
@@ -109,12 +109,11 @@ final class AppModel: ObservableObject {
     /// changes by itself ("done" ending, a stuck mood resting).
     func sessionsChanged(_ sessions: [CrabSession]) {
         crabSessions = sessions
+        guard !showingDemo else { return }
         now = Date()
         crabCheck?.invalidate()
         if let next = Crab.nextChange(sessions, now: now) {
-            crabCheck = Timer.scheduledTimer(withTimeInterval: next.timeIntervalSince(now) + 0.2, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
-            }
+            crabCheck = commonModeTimer(after: next.timeIntervalSince(now) + 0.2)
         }
     }
 
@@ -210,11 +209,17 @@ final class AppModel: ObservableObject {
         claudeCodeQuietChecks.forEach { $0.invalidate() }
         // One just after the quiet period (the crab goes from tool to done), one after the
         // fallback "done" has ended too (the crab goes).
-        claudeCodeQuietChecks = [InUse.claudeCodeQuiet + 0.5, InUse.claudeCodeQuiet + Crab.doneLasts + 0.5].map { delay in
-            Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
-            }
+        claudeCodeQuietChecks = [InUse.claudeCodeQuiet + 0.5, InUse.claudeCodeQuiet + Crab.doneLasts + 0.5].map(commonModeTimer(after:))
+    }
+
+    /// A one-shot timer that ticks the model, in common run-loop modes so it still fires
+    /// while a menu is open.
+    private func commonModeTimer(after delay: TimeInterval) -> Timer {
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
     }
 
     func tick() { now = Date() }

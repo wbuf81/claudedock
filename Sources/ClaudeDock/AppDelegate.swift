@@ -74,6 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self, !self.model.settings.demoMode else { return }
                 self.model.tick()
                 self.crabSessions?.reload()
+                let connected = self.hookFile.isConnected()   // settings.json can change behind our back
+                if connected != self.model.hooksConnected { self.model.hooksConnected = connected }
             }
         }
 
@@ -135,11 +137,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try connect ? hookFile.connect() : hookFile.disconnect()
         } catch HookFileError.unreadable(let why) {
             let alert = NSAlert()
-            alert.messageText = "Couldn't connect to Claude Code"
+            alert.messageText = connect ? "Couldn't connect to Claude Code" : "Couldn't disconnect from Claude Code"
             alert.informativeText = why
+            NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         } catch {
             let alert = NSAlert(error: error)
+            NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
         model.hooksConnected = hookFile.isConnected()
