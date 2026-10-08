@@ -24,6 +24,11 @@ final class AppModel: ObservableObject {
     @Published var widgetHeight: CGFloat = 60
     /// Stacked as a narrow strip, for the left and right edges.
     @Published var vertical = false
+    /// The side the crab perches on; `DockController` sets it with the layout.
+    @Published var crabEdge: CrabEdge = .top
+    /// The crab's size, and how far it sticks out of the glass (its top 58%).
+    var crabSize: CGFloat { 50 * widgetScale }
+    var crabDepth: CGFloat { settings.showCrab ? crabSize * 0.58 : 0 }
     /// When Claude Code last wrote a transcript; it writes every few seconds while it works.
     private(set) var claudeCodeActiveAt: Date?
     /// Live Claude Code sessions, from Claude Dock's hooks.
