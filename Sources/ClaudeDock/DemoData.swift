@@ -11,6 +11,8 @@ struct DemoScenario {
     /// Claude Code is working on `claudeCodeOrg`, so it shows the in-use effect.
     var claudeCodeWorking = false
     var now: Date
+    /// The crab's mood on `claudeCodeOrg`; nil shows no crab.
+    var crab: CrabMood? = nil
 }
 
 /// Pokémon sample data, so no real account ever shows up in a demo or a screenshot.

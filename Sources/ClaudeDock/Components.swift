@@ -96,6 +96,10 @@ struct WidgetActions {
     var amount: (EffectAmount) -> Void = { _ in }
     /// A trackpad pinch: the magnification so far, and whether the pinch has ended.
     var pinch: (Double, Bool) -> Void = { _, _ in }
+    /// Shows or hides the crab.
+    var showCrab: (Bool) -> Void = { _ in }
+    /// Connects (true) or disconnects (false) Claude Dock's hooks.
+    var connectHooks: (Bool) -> Void = { _ in }
 
     static let none = WidgetActions()
 }

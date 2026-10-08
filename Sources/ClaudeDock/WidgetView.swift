@@ -166,6 +166,10 @@ struct WidgetView: View {
                 check(name, abs(settings.sizeScale - scale) < 0.01) { actions.size(scale) }
             }
         }
+        check("Show the crab", settings.showCrab) { actions.showCrab(!settings.showCrab) }
+        Button(model.hooksConnected ? "Disconnect from Claude Code" : "Connect to Claude Code…") {
+            actions.connectHooks(!model.hooksConnected)
+        }
         check("Shrink until hovered", settings.compact) { actions.compact(!settings.compact) }
         Menu("In-use effect") {
             ForEach(EffectStyle.allCases, id: \.self) { style in
