@@ -100,6 +100,9 @@ public struct GrowthAnchor: Equatable, Sendable {
     }
 }
 
+/// The side of the widget the crab perches on: the one facing the middle of the screen.
+public enum CrabEdge: Equatable, Sendable { case top, bottom, left, right }
+
 public enum WidgetLayout {
     /// Automatic is vertical on the left and right edges, like a side Dock, and horizontal
     /// everywhere else.
@@ -203,6 +206,36 @@ public enum WidgetPlacement {
         return CGRect(x: min(max(x, visible.minX), visible.maxX - size.width),
                       y: min(max(y, screen.minY), visible.maxY - size.height),
                       width: size.width, height: size.height)
+    }
+
+    /// Above the widget in the lower half, below it in the upper half; beside a vertical
+    /// strip, on its inner side.
+    public static func crabEdge(anchor: GrowthAnchor, vertical: Bool) -> CrabEdge {
+        if vertical { return anchor.horizontal == .right ? .left : .right }
+        return anchor.vertical == .top ? .bottom : .top
+    }
+
+    /// The window's frame: the glass plus a clear band `depth` deep on the crab's side.
+    public static func withCrabBand(_ glass: CGRect, edge: CrabEdge, depth: Double) -> CGRect {
+        switch edge {
+        case .top: CGRect(x: glass.minX, y: glass.minY, width: glass.width, height: glass.height + depth)
+        case .bottom: CGRect(x: glass.minX, y: glass.minY - depth, width: glass.width, height: glass.height + depth)
+        case .left: CGRect(x: glass.minX - depth, y: glass.minY, width: glass.width + depth, height: glass.height)
+        case .right: CGRect(x: glass.minX, y: glass.minY, width: glass.width + depth, height: glass.height)
+        }
+    }
+
+    /// The compact frame that `full` grew out of from its anchored edges: where the widget is
+    /// saved when the owner moves it while it's full size.
+    public static func compactFrame(full: CGRect, size: CGSize, anchor: GrowthAnchor) -> CGRect {
+        let x = anchor.horizontal == .right ? full.maxX - size.width : full.minX
+        let y: Double
+        switch anchor.vertical {
+        case .bottom: y = full.minY
+        case .top: y = full.maxY - size.height
+        case .center: y = full.midY - size.height / 2
+        }
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
     }
 
     /// The panel opens toward the middle of the screen. Beside a vertical widget on a side;

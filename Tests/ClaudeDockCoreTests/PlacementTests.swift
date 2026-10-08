@@ -290,3 +290,34 @@ let visibleWithDock = CGRect(x: 0, y: 90, width: 2560, height: 1350)
         #expect(grown(low, CGSize(width: 104, height: 300), .snapped(.rightMiddle)).minY == 0)
     }
 }
+
+@Suite struct CrabBandTests {
+    @Test func theCrabSitsOnTheSideFacingTheMiddle() {
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.right, .bottom), vertical: false) == .top)
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.left, .bottom), vertical: false) == .top)
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.right, .top), vertical: false) == .bottom)
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.right, .center), vertical: true) == .left)
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.left, .center), vertical: true) == .right)
+        #expect(WidgetPlacement.crabEdge(anchor: GrowthAnchor(.right, .center), vertical: false) == .top)
+    }
+
+    @Test func theBandExtendsTheGlassOnThatSide() {
+        let glass = CGRect(x: 100, y: 10, width: 150, height: 80)
+        #expect(WidgetPlacement.withCrabBand(glass, edge: .top, depth: 29) == CGRect(x: 100, y: 10, width: 150, height: 109))
+        #expect(WidgetPlacement.withCrabBand(glass, edge: .bottom, depth: 29) == CGRect(x: 100, y: -19, width: 150, height: 109))
+        #expect(WidgetPlacement.withCrabBand(glass, edge: .left, depth: 29) == CGRect(x: 71, y: 10, width: 179, height: 80))
+        #expect(WidgetPlacement.withCrabBand(glass, edge: .right, depth: 29) == CGRect(x: 100, y: 10, width: 179, height: 80))
+        #expect(WidgetPlacement.withCrabBand(glass, edge: .top, depth: 0) == glass)
+    }
+
+    @Test func compactFrameUndoesTheGrowth() {
+        let full = CGRect(x: 900, y: 20, width: 500, height: 80)
+        #expect(WidgetPlacement.compactFrame(full: full, size: CGSize(width: 150, height: 80), anchor: GrowthAnchor(.right, .bottom))
+                == CGRect(x: 1250, y: 20, width: 150, height: 80))
+        #expect(WidgetPlacement.compactFrame(full: full, size: CGSize(width: 150, height: 80), anchor: GrowthAnchor(.left, .top))
+                == CGRect(x: 900, y: 20, width: 150, height: 80))
+        let strip = CGRect(x: 10, y: 300, width: 104, height: 400)
+        #expect(WidgetPlacement.compactFrame(full: strip, size: CGSize(width: 68, height: 200), anchor: GrowthAnchor(.left, .center))
+                == CGRect(x: 10, y: 400, width: 68, height: 200))
+    }
+}
