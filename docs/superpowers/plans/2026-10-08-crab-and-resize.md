@@ -19,7 +19,7 @@
 - Comment density and style: short doc comments in plain English on every type and non-obvious function, like the existing files. Copy in the UI is sentence case.
 - Crab: sprites 96×96 px, 24 frames, 70 ms per frame (1.68 s loop); moods `idle`, `thinking`, `tool`, `permission`, `done`; drawn at `50 * k` pt where `k = model.widgetScale`; perched with its top 58% outside the glass (`crabDepth = 29 * k`).
 - Mood priority: `permission` > `tool` > `thinking` > `done` > `idle`. `done` lasts 10 s, then `idle`. Any non-idle, non-done mood unchanged for 10 min becomes `idle`. Session files older than 12 h are ignored.
-- Hook marker: every command Claude Dock adds ends with `# claude-dock`. Sessions folder: `~/Library/Application Support/Claude Dock/sessions/`, one file per Claude Code process id containing `"<mood> <unix seconds>\n"`.
+- Hook marker: every command Claude Dock adds ends with `# claude-dock`. Sessions folder: `~/Library/Application Support/ClaudeDock/sessions/`, one file per Claude Code process id containing `"<mood> <unix seconds>\n"`.
 - Verified on this Mac (2026-10-08): inside a hook command, `$PPID` is the `claude` process and stays the same for every event of a session.
 - Commit messages: imperative sentence, no prefix (match `git log`), ending with the attribution line `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>` (or the implementing model's own line).
 
@@ -342,7 +342,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Produces:
   - `public enum ClaudeCodeHooks { static let marker: String; static func command(_ action: String) -> String; static func install(into: [String: Any]) -> [String: Any]; static func remove(from: [String: Any]) -> [String: Any]; static func isInstalled(_: [String: Any]) -> Bool }`
   - `public struct ClaudeCodeHookFile { init(settings: URL, support: URL); func isConnected() -> Bool; func connect() throws; func disconnect() throws }` and `public enum HookFileError: Error, Equatable { case unreadable(String) }`
-  - `public static let defaultSupport: URL` on `ClaudeCodeHookFile` = `~/Library/Application Support/Claude Dock`
+  - `public static let defaultSupport: URL` on `ClaudeCodeHookFile` = `~/Library/Application Support/ClaudeDock`
 
 Hook JSON shape (Claude Code): `{"hooks": {"<Event>": [ {"matcher": "<m>"?, "hooks": [ {"type": "command", "command": "<sh>"} ]} ]}}`.
 
@@ -499,10 +499,10 @@ public enum ClaudeCodeHooks {
 
     /// The shell command for one action: a mood, or "end" to delete the session's file.
     public static func command(_ action: String) -> String {
-        let folder = #"d="$HOME/Library/Application Support/Claude Dock/sessions""#
+        let folder = #"d="$HOME/Library/Application Support/ClaudeDock/sessions""#
         let body = action == "end"
-            ? #"rm -f "$d/$PPID""#
-            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.tmp" && mv -f "$d/$PPID.tmp" "$d/$PPID""#
+            ? #"rm -f "$d/$PPID" || true"#
+            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp" "$d/$PPID" || true"#
         return "cat >/dev/null; \(folder); \(body) \(marker)"
     }
 
@@ -564,7 +564,7 @@ public struct ClaudeCodeHookFile: Sendable {
 
     public static let defaultSettings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
     public static let defaultSupport = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/Claude Dock")
+        .appendingPathComponent("Library/Application Support/ClaudeDock")
 
     public init(settings: URL = defaultSettings, support: URL = defaultSupport) {
         self.settings = settings
@@ -1270,7 +1270,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Demo moods.** In `DemoData.scenarios`, the scenario created with `working: true` gets `crab: .tool`; add `crab: .permission` to one other scenario whose Claude Code org is Pikachu. Use the existing `scenario(...)` helper: extend it with a `crab: CrabMood? = nil` parameter passed to `DemoScenario(... crab: crab)`.
 - [ ] **Step 2: Render.** Run: `swift run ClaudeDock --render /tmp/claudedock-render` (check `main.swift` for the exact flag if this differs). Open the `*-compact-dark.png` of the `tool` scenario: the crab's first frame sits on the top edge above Pikachu's ring, about half above the glass. Nothing is committed from `/tmp`.
-- [ ] **Step 3: README.** In the widget section: drag the inner edge to resize (Size ▸ Compact / Full), click for the card, no hover. New section "The crab": what each mood means (idle, thinking, using a tool, waiting for you with the red !, done), that it sits on the org Claude Code is signed into, **Show the crab**, **Connect to Claude Code…** and what it adds, and that without connecting the crab only types and celebrates. In-use effect: now "desktop app and browser use". **Privacy**: "Connecting adds hooks to `~/.claude/settings.json` that write only the event name and time to a file per session in `~/Library/Application Support/Claude Dock/sessions`. Claude Dock never reads your prompts or transcripts. Disconnect removes them, and puts the file back exactly as it was if nothing else changed it." Uninstall section: Disconnect first. Do not update screenshots in this task.
+- [ ] **Step 3: README.** In the widget section: drag the inner edge to resize (Size ▸ Compact / Full), click for the card, no hover. New section "The crab": what each mood means (idle, thinking, using a tool, waiting for you with the red !, done), that it sits on the org Claude Code is signed into, **Show the crab**, **Connect to Claude Code…** and what it adds, and that without connecting the crab only types and celebrates. In-use effect: now "desktop app and browser use". **Privacy**: "Connecting adds hooks to `~/.claude/settings.json` that write only the event name and time to a file per session in `~/Library/Application Support/ClaudeDock/sessions`. Claude Dock never reads your prompts or transcripts. Disconnect removes them, and puts the file back exactly as it was if nothing else changed it." Uninstall section: Disconnect first. Do not update screenshots in this task.
 - [ ] **Step 4: Manual checks.** Append to `docs/manual-checks.md` a "Crab and resizing" section with these unchecked items:
 
 ```markdown

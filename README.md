@@ -79,8 +79,9 @@ Lots), or pinch on your trackpad over it to resize freely.
 
 ## The crab
 
-A small crab perches on top of the org Claude Code is signed into, half above the glass,
-and shows what Claude Code is doing:
+A small crab perches on the org Claude Code is signed into, mostly outside the glass: above
+the widget, below it when the widget is at a top position, and beside it on a vertical
+strip. It shows what Claude Code is doing:
 
 - **Idle**: resting.
 - **Thinking**: pondering.
@@ -93,7 +94,8 @@ writing), and hides when the widget's data is stale. Right-click → **Show the 
 to `~/.claude/settings.json` (after asking) so the crab sees each event within about a
 second; **Disconnect from Claude Code** removes them. Without connecting, the crab still
 types while Claude Code works and celebrates when it stops, but it can't tell thinking from
-tools or show the **!**.
+tools or show the **!**. Claude Code sessions started before you connect keep running
+without the hooks until you restart them.
 
 ## Every state
 
@@ -194,11 +196,11 @@ red, and if claude.ai signs it out.
   sends chats, changes settings or touches billing.
 - It reads **one field** from `~/.claude.json`: which org Claude Code is signed into.
 - Connecting adds hooks to `~/.claude/settings.json` that write only what Claude Code is doing (a word like thinking or done) and the time
-  to a file per session in `~/Library/Application Support/Claude Dock/sessions`. Claude Dock
+  to a file per session in `~/Library/Application Support/ClaudeDock/sessions`. Claude Dock
   never reads your prompts or transcripts. Disconnect removes them, and puts the file back
   exactly as it was if nothing else changed it; if something else did, it removes only Claude
-  Dock's entries. Claude Dock keeps a copy of the file from before Connect in its support
-  folder (`settings-before-connect.json`).
+  Dock's entries. Claude Dock keeps copies of the file in its support folder: from before
+  Connect (`settings-before-connect.json`) and as Connect wrote it (`settings-after-connect.json`).
 - It watches `~/.claude/projects` for changes, to know when Claude Code is working. It
   never opens those files.
 - History stays on your Mac in `~/Library/Application Support/ClaudeDock/`, kept 35 days.
@@ -217,7 +219,6 @@ WebKit folder, so this signs it out for good):
 ```sh
 rm -rf "/Applications/Claude Dock.app" \
   ~/Library/Application\ Support/ClaudeDock \
-  ~/Library/Application\ Support/Claude\ Dock \
   ~/Library/WebKit/com.wbuf81.claudedock \
   ~/Library/HTTPStorages/com.wbuf81.claudedock* \
   ~/Library/Caches/com.wbuf81.claudedock

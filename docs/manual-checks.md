@@ -82,6 +82,8 @@ a real Mac, a real account, or a person. Tick what you checked and on what.
 - [ ] Connect: the confirmation; `~/.claude/settings.json` gains entries ending in `# claude-dock`; other hooks unchanged. Disconnect right after: the file is byte-identical (`shasum` before and after).
 - [ ] A Claude Code prompt: thinking, then tool while it runs a command, then done for about 10 s, then idle; all within about a second of each event.
 - [ ] A permission prompt shows the red ! within a second.
+- [ ] Press Esc mid-turn: the crab rests within about a minute.
+- [ ] Approve a long command: the ! stays until the command finishes (Claude Code sends no hook on approval).
 - [ ] Two sessions, one waiting for permission: the crab shows the !.
 - [ ] `kill -9` a session: its crab goes within 30 s.
 - [ ] Not connected: the crab types while Claude Code works, celebrates, then leaves.
