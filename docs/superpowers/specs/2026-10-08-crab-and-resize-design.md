@@ -113,7 +113,7 @@ those entries. Both are idempotent.
 Each hook is one `/bin/sh` command with no other dependency, for example (PreToolUse):
 
 ```sh
-d="$HOME/Library/Application Support/Claude Dock/sessions"; mkdir -p "$d" && printf 'tool %s\n' "$(date +%s)" > "$d/$PPID.tmp" && mv "$d/$PPID.tmp" "$d/$PPID"; cat >/dev/null
+cat >/dev/null; d="$HOME/Library/Application Support/ClaudeDock/sessions"; mkdir -p "$d" && printf 'tool %s\n' "$(date +%s)" > "$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp" "$d/$PPID" || true # claude-dock
 ```
 
 - `$PPID` is the Claude Code process that ran the hook: it names the session file and is the

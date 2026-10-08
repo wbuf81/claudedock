@@ -11,6 +11,8 @@ struct DemoScenario {
     /// Claude Code is working on `claudeCodeOrg`, so it shows the in-use effect.
     var claudeCodeWorking = false
     var now: Date
+    /// The crab's mood on `claudeCodeOrg`; nil shows no crab.
+    var crab: CrabMood? = nil
 }
 
 /// Pokémon sample data, so no real account ever shows up in a demo or a screenshot.
@@ -30,20 +32,20 @@ enum DemoData {
             Reading(time: now, org: org.id, session: session, sessionResetsAt: sessionReset.map(at),
                     week: week, weekResetsAt: weekReset.map(onTheHour), scoped: ["Fable": fable])
         }
-        func scenario(_ name: String, working: Bool = false, _ readings: [Reading]) -> DemoScenario {
+        func scenario(_ name: String, working: Bool = false, crab: CrabMood? = nil, _ readings: [Reading]) -> DemoScenario {
             DemoScenario(name: name, orgs: [pikachu, charizard], primary: pikachu.id,
-                         readings: readings, claudeCodeOrg: pikachu.id, claudeCodeWorking: working, now: now)
+                         readings: readings, claudeCodeOrg: pikachu.id, claudeCodeWorking: working, now: now, crab: crab)
         }
         return [
             scenario("green-and-red", [
                 r(pikachu, week: 55, weekReset: 64.5, session: 1, sessionReset: 4.8, fable: 31),
                 r(charizard, week: 95, weekReset: 33.5, fable: 2),
             ]),
-            scenario("switch-for-desktop-app", working: true, [
+            scenario("switch-for-desktop-app", working: true, crab: .tool, [
                 r(pikachu, week: 60, weekReset: 64.5, session: 85, sessionReset: 1.5),
                 r(charizard, week: 40, weekReset: 40),
             ]),
-            scenario("use-it-before-it-expires", [
+            scenario("use-it-before-it-expires", crab: .permission, [
                 r(pikachu, week: 30, weekReset: 64.5, session: 10, sessionReset: 3),
                 r(charizard, week: 70, weekReset: 33.5),
             ]),

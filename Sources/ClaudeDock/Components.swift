@@ -90,12 +90,16 @@ struct WidgetActions {
     var place: (SnapPoint) -> Void = { _ in }
     var layout: (LayoutChoice) -> Void = { _ in }
     var size: (Double) -> Void = { _ in }
-    /// Turns Shrink until hovered on or off.
+    /// Shows the compact (true) or full (false) widget.
     var compact: (Bool) -> Void = { _ in }
     var effect: (EffectStyle) -> Void = { _ in }
     var amount: (EffectAmount) -> Void = { _ in }
     /// A trackpad pinch: the magnification so far, and whether the pinch has ended.
     var pinch: (Double, Bool) -> Void = { _, _ in }
+    /// Shows or hides the crab.
+    var showCrab: (Bool) -> Void = { _ in }
+    /// Connects (true) or disconnects (false) Claude Dock's hooks.
+    var connectHooks: (Bool) -> Void = { _ in }
 
     static let none = WidgetActions()
 }

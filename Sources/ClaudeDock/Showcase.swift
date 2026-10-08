@@ -172,7 +172,7 @@ private struct DesktopScene: View {
 }
 
 /// The bottom-right of a desktop twice: the compact widget beside the Dock, and the full
-/// widget it grows to when the pointer rests on it.
+/// widget it grows to when it is dragged out.
 private struct CompactScene: View {
     @ObservedObject var model: AppModel
 

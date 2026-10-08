@@ -55,17 +55,12 @@ a real Mac, a real account, or a person. Tick what you checked and on what.
 - [ ] A 24-hour region (System Settings → General → Language & Region): times read "16:00".
 - [ ] Changing the time zone updates the times within a minute, without relaunching.
 
-## Compact and in use
+## In use
 
-- [ ] Hover grows the widget and leaving shrinks it, with another app in front, over a
-      full-screen app, on every Position, and in the vertical strip.
-- [ ] Expanded beside the Dock, it draws over the Dock.
-- [ ] Click: the panel opens against the expanded widget, which stays expanded until the
-      panel closes.
-- [ ] Reduce Motion: the widget only crossfades, and an org in use shows a still glow.
-- [ ] Claude Code working: particles on its org within about 2 s, gone about 60 s after it
+- [ ] Reduce Motion: the widget doesn't animate, and an org in use shows a still glow.
+- [ ] With Show the crab off, Claude Code working: particles on its org within about 2 s, gone about 60 s after it
       stops.
-- [ ] A desktop-app chat on the primary org: particles there within one poll (3 minutes).
+- [ ] A desktop-app or browser chat on the primary org: particles there within one poll (3 minutes).
 - [ ] Each In-use effect and amount: Activity Monitor shows Claude Dock near 0% CPU.
 
 ## When things go wrong
@@ -76,3 +71,20 @@ a real Mac, a real account, or a person. Tick what you checked and on what.
 ## Uninstall
 
 - [ ] The README's uninstall steps leave nothing behind (`ls ~/Library/*/com.wbuf81.claudedock*`).
+
+## Crab and resizing
+
+- [ ] Drag the inner edge at every snap point and in the vertical strip: follows the pointer, snaps to the nearer size, remembered after relaunch. Reduce Motion: no frame animation.
+- [ ] Starting a drag 7 pt or more inside the inner edge moves the widget instead of resizing it.
+- [ ] Resize while the card is open: the card follows the widget.
+- [ ] Click opens the card at both sizes; the widget doesn't change size.
+- [ ] Clicks on the clear band beside the crab reach the window behind (a Terminal window reaching down to the Dock).
+- [ ] Connect: the confirmation; `~/.claude/settings.json` gains entries ending in `# claude-dock`; other hooks unchanged. Disconnect right after: the file is byte-identical (`shasum` before and after).
+- [ ] A Claude Code prompt: thinking, then tool while it runs a command, then done for about 10 s, then idle; all within about a second of each event.
+- [ ] A permission prompt shows the red ! within a second.
+- [ ] Press Esc mid-turn: the crab rests within about a minute.
+- [ ] Approve a long command: the ! stays until the command finishes (Claude Code sends no hook on approval).
+- [ ] Two sessions, one waiting for permission: the crab shows the !.
+- [ ] `kill -9` a session: its crab goes within 30 s.
+- [ ] Not connected: the crab types while Claude Code works, celebrates, then leaves.
+- [ ] Activity Monitor: Claude Dock near 0% CPU while the crab animates.

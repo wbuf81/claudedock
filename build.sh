@@ -50,6 +50,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+# The crab's animation frames.
+mkdir -p "$APP/Contents/Resources"
+cp -R Resources/crab "$APP/Contents/Resources/crab"
+
 # Ad-hoc signed, but with a designated requirement of just the bundle id, so macOS keeps
 # privacy permissions (like notifications) across rebuilds instead of tying them to each
 # build's hash.

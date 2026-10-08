@@ -3,7 +3,7 @@ import ClaudeDockCore
 
 /// The always-on widget: one block per org, plus a switch tab when there's advice. A
 /// horizontal bar as tall as the Dock, or a narrow vertical strip on the left and right
-/// edges; in compact mode each org shrinks to its ring, name and 5-hour line. Contents
+/// edges; the compact widget shows each org as its ring, name and 5-hour line. Contents
 /// scale with the Dock's icon size and the owner's size setting.
 struct WidgetView: View {
     @ObservedObject var model: AppModel
@@ -22,6 +22,8 @@ struct WidgetView: View {
         }
         .opacity(model.isStale ? 0.55 : 1)
         .contentShape(Rectangle())
+        .overlayPreferenceValue(CrabRingKey.self) { anchor in crab(anchor) }
+        .padding(crabPadding, model.crabDepth)
         .gesture(DragGesture(minimumDistance: 4)
             .onChanged { _ in actions.dragChanged() }
             .onEnded { _ in actions.dragEnded() })
@@ -33,6 +35,32 @@ struct WidgetView: View {
     }
 
     private var k: CGFloat { model.widgetScale }
+
+    private var crabPadding: Edge.Set {
+        switch model.crabEdge {
+        case .top: .top
+        case .bottom: .bottom
+        case .left: .leading
+        case .right: .trailing
+        }
+    }
+
+    /// The crab perched on the edge of the glass beside its ring: 58% of it outside the glass.
+    @ViewBuilder
+    private func crab(_ anchor: Anchor<CGRect>?) -> some View {
+        if let anchor, let mood = model.orgs.lazy.compactMap({ model.crabMood(for: $0) }).first {
+            GeometryReader { proxy in
+                let ring = proxy[anchor], size = model.crabSize, out = size * 0.58
+                let center: CGPoint = switch model.crabEdge {
+                case .top: CGPoint(x: ring.midX, y: -out + size / 2)
+                case .bottom: CGPoint(x: ring.midX, y: proxy.size.height + out - size / 2)
+                case .left: CGPoint(x: -out + size / 2, y: ring.midY)
+                case .right: CGPoint(x: proxy.size.width + out - size / 2, y: ring.midY)
+                }
+                CrabView(mood: mood, size: size).position(center)
+            }
+        }
+    }
 
     private var bar: some View {
         HStack(spacing: 0) {
@@ -165,8 +193,14 @@ struct WidgetView: View {
             ForEach(Self.sizes, id: \.1) { name, scale in
                 check(name, abs(settings.sizeScale - scale) < 0.01) { actions.size(scale) }
             }
+            Divider()
+            check("Compact", settings.compact) { actions.compact(true) }
+            check("Full", !settings.compact) { actions.compact(false) }
         }
-        check("Shrink until hovered", settings.compact) { actions.compact(!settings.compact) }
+        check("Show the crab", settings.showCrab) { actions.showCrab(!settings.showCrab) }
+        Button(model.hooksConnected ? "Disconnect from Claude Code" : "Connect to Claude Code…") {
+            actions.connectHooks(!model.hooksConnected)
+        }
         Menu("In-use effect") {
             ForEach(EffectStyle.allCases, id: \.self) { style in
                 check(Self.title(style), settings.effectStyle == style) { actions.effect(style) }
@@ -220,6 +254,19 @@ struct WidgetView: View {
     }
 }
 
+/// The ring the crab perches on, in the widget's coordinates.
+private struct CrabRingKey: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) { value = value ?? nextValue() }
+}
+
+private extension View {
+    /// Reports this ring's bounds when the crab sits on its org.
+    func crabRing(_ on: Bool) -> some View {
+        anchorPreference(key: CrabRingKey.self, value: .bounds) { on ? $0 : nil }
+    }
+}
+
 /// One org: week ring, name and stoplight dot, 5-hour bar, caption. Side by side in the
 /// horizontal bar; stacked and centred in the vertical strip.
 private struct OrgBlock: View {
@@ -246,6 +293,7 @@ private struct OrgBlock: View {
         let ringColor = light == .red ? Palette.crit : Palette.accent
         let ring = WeekRing(used: reading?.week ?? 0, elapsed: forecast?.elapsedFraction ?? 0, color: ringColor, size: 48 * k)
             .inUseEffect(inUse, .ring(fill: (reading?.week ?? 0) / 100, radius: 18 * k), settings: model.settings, color: ringColor)
+            .crabRing(model.crabMood(for: org) != nil)
         let name = HStack(spacing: 6 * k) {
             Text(org.name)
                 .font(.system(size: max(13 * k, 11), weight: .semibold))
@@ -320,6 +368,7 @@ private struct CompactOrg: View {
                             .padding(-2 * k))
                         .offset(x: -1 * k, y: 1 * k)
                 }
+                .crabRing(model.crabMood(for: org) != nil)
             Text(org.name)
                 .font(.system(size: max(10 * k, 9), weight: .semibold))
                 .lineLimit(1)

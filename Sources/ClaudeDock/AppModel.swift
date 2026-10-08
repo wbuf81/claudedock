@@ -24,12 +24,24 @@ final class AppModel: ObservableObject {
     @Published var widgetHeight: CGFloat = 60
     /// Stacked as a narrow strip, for the left and right edges.
     @Published var vertical = false
+    /// The side the crab perches on; `DockController` sets it with the layout.
+    @Published var crabEdge: CrabEdge = .top
+    /// The crab's size, and how far it sticks out of the glass (its top 58%).
+    var crabSize: CGFloat { 50 * widgetScale }
+    var crabDepth: CGFloat { settings.showCrab ? crabSize * 0.58 : 0 }
     /// When Claude Code last wrote a transcript; it writes every few seconds while it works.
     private(set) var claudeCodeActiveAt: Date?
+    /// Live Claude Code sessions, from Claude Dock's hooks.
+    @Published private(set) var crabSessions: [CrabSession] = []
+    /// Claude Dock's hooks are in Claude Code's settings.
+    @Published var hooksConnected = false
+    /// The crab's mood in a demo scenario.
+    private var demoCrab: CrabMood?
+    private var crabCheck: Timer?
     /// Each org's reading before its newest, to tell whether its usage just went up.
     private var previous: [String: Reading] = [:]
     private var settingsChanges: AnyCancellable?
-    private var claudeCodeQuietCheck: Timer?
+    private var claudeCodeQuietChecks: [Timer] = []
 
     let settings: Settings
     let formatting = Formatting()
@@ -76,10 +88,33 @@ final class AppModel: ObservableObject {
         reading(for: org).map { Stoplight.light($0, forecast(for: org), settings.thresholds) }
     }
 
-    /// Whether an org is being used right now; it gets the in-use effect.
+    /// The crab on this org, or nil: it shows on the org Claude Code is signed into while a
+    /// session is live (or, without hooks, while Claude Code is writing transcripts).
+    func crabMood(for org: Org) -> CrabMood? {
+        guard settings.showCrab, !isStale, org.id == claudeCodeOrg else { return nil }
+        if showingDemo { return demoCrab }
+        guard hooksConnected else { return Crab.fallbackMood(claudeCodeActiveAt: claudeCodeActiveAt, now: now) }
+        return Crab.settle(Crab.mood(crabSessions, isAlive: CrabSessions.isAlive, now: now),
+                           sessions: crabSessions, claudeCodeActiveAt: claudeCodeActiveAt, now: now)
+    }
+
+    /// Whether an org is being used right now; it gets the in-use effect. Claude Code's own
+    /// activity shows as the crab instead, so only a rise in usage counts on the crab's org.
     func inUse(for org: Org) -> Bool {
         InUse.isInUse(org: org.id, latest: latest[org.id], previous: previous[org.id], claudeCodeOrg: claudeCodeOrg,
-                      claudeCodeActiveAt: claudeCodeActiveAt, stale: isStale, now: now)
+                      claudeCodeActiveAt: crabMood(for: org) == nil ? claudeCodeActiveAt : nil, stale: isStale, now: now)
+    }
+
+    /// The hooks wrote, or the sessions were re-read. Redraws now and when the mood next
+    /// changes by itself ("done" ending, a stuck mood resting).
+    func sessionsChanged(_ sessions: [CrabSession]) {
+        crabSessions = sessions
+        guard !showingDemo else { return }
+        now = Date()
+        crabCheck?.invalidate()
+        if let next = Crab.nextChange(sessions, now: now) {
+            crabCheck = commonModeTimer(after: next.timeIntervalSince(now) + 0.2)
+        }
     }
 
     var statuses: [OrgStatus] {
@@ -171,10 +206,20 @@ final class AppModel: ObservableObject {
         let wasWorking = claudeCodeActiveAt.map { time.timeIntervalSince($0) < InUse.claudeCodeQuiet } ?? false
         claudeCodeActiveAt = time
         if !wasWorking { now = time }
-        claudeCodeQuietCheck?.invalidate()
-        claudeCodeQuietCheck = Timer.scheduledTimer(withTimeInterval: InUse.claudeCodeQuiet + 0.5, repeats: false) { [weak self] _ in
+        claudeCodeQuietChecks.forEach { $0.invalidate() }
+        // One just after the quiet period (the crab goes from tool to done), one after the
+        // fallback "done" has ended too (the crab goes).
+        claudeCodeQuietChecks = [InUse.claudeCodeQuiet + 0.5, InUse.claudeCodeQuiet + Crab.doneLasts + 0.5].map(commonModeTimer(after:))
+    }
+
+    /// A one-shot timer that ticks the model, in common run-loop modes so it still fires
+    /// while a menu is open.
+    private func commonModeTimer(after delay: TimeInterval) -> Timer {
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
     }
 
     func tick() { now = Date() }
@@ -193,6 +238,7 @@ final class AppModel: ObservableObject {
 
     func apply(_ scenario: DemoScenario) {
         primaryOverride = scenario.primary
+        demoCrab = scenario.crab
         clearProblems()
         orgs = scenario.orgs
         latest = Dictionary(uniqueKeysWithValues: scenario.readings.map { ($0.org, $0) })
@@ -208,6 +254,7 @@ final class AppModel: ObservableObject {
 
     func leaveDemo() {
         primaryOverride = nil
+        demoCrab = nil
         clearProblems()
         orgs = []
         latest = [:]

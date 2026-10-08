@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var demo: Task<Void, Never>?
     private var clock: Timer?
     private var claudeCodeActivity: ClaudeCodeActivity?
+    private var crabSessions: CrabSessions?
+    private let hookFile = ClaudeCodeHookFile()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = Settings(defaults: .standard)
@@ -34,7 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             compact: { [weak self] in self?.dock.setCompact($0) },
             effect: { [weak self] in self?.model.settings.effectStyle = $0 },
             amount: { [weak self] in self?.model.settings.effectAmount = $0 },
-            pinch: { [weak self] in self?.dock.pinch($0, ended: $1) }))
+            pinch: { [weak self] in self?.dock.pinch($0, ended: $1) },
+            showCrab: { [weak self] in self?.model.settings.showCrab = $0 },
+            connectHooks: { [weak self] in self?.setHooks($0) }))
 
         dock.onPanelOpened = { [weak self] in
             guard let self, !self.model.settings.demoMode else { return }
@@ -69,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self, !self.model.settings.demoMode else { return }
                 self.model.tick()
+                self.crabSessions?.reload()
+                let connected = self.hookFile.isConnected()   // settings.json can change behind our back
+                if connected != self.model.hooksConnected { self.model.hooksConnected = connected }
             }
         }
 
@@ -76,6 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.claudeCodeWorked(at: time) } }
         }
         claudeCodeActivity?.start()
+        model.hooksConnected = hookFile.isConnected()
+        crabSessions = CrabSessions { [weak self] sessions in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.sessionsChanged(sessions) } }
+        }
+        crabSessions?.start()
 
         registerLoginItemOnce()
         dock.show()
@@ -103,6 +115,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             session.showSignIn()
         }
+    }
+
+    /// Adds or removes Claude Dock's hooks, after saying what Connect will change.
+    private func setHooks(_ connect: Bool) {
+        if connect {
+            let alert = NSAlert()
+            alert.messageText = "Connect to Claude Code?"
+            alert.informativeText = """
+                Claude Dock will add hooks to ~/.claude/settings.json. Each writes only what \
+                Claude Code is doing (thinking, using a tool, waiting for you, done) and the time \
+                to a file in Claude Dock's folder. Your prompts and transcripts are never read. \
+                Your other hooks stay as they are. Disconnect removes them.
+                """
+            alert.addButton(withTitle: "Connect")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        do {
+            try connect ? hookFile.connect() : hookFile.disconnect()
+        } catch HookFileError.unreadable(let why) {
+            let alert = NSAlert()
+            alert.messageText = connect ? "Couldn't connect to Claude Code" : "Couldn't disconnect from Claude Code"
+            alert.informativeText = why
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        } catch {
+            let alert = NSAlert(error: error)
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+        model.hooksConnected = hookFile.isConnected()
+        crabSessions?.reload()
     }
 
     private func setDemoMode(_ on: Bool) {
