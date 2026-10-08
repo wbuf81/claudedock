@@ -3,7 +3,7 @@ import AppKit
 /// How far a resize drag has gone: the pointer's travel since it began, in screen points.
 enum ResizePhase {
     case began
-    case moved(dx: CGFloat, dy: CGFloat)
+    case moved(dx: CGFloat)
     case ended
 }
 
@@ -46,6 +46,8 @@ final class WidgetContainer: NSView {
 final class EdgeHandle: NSView {
     var onResize: ((ResizePhase) -> Void)?
     private var start = NSPoint.zero
+    private var dragging = false
+    private var upMonitor: Any?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -59,18 +61,40 @@ final class EdgeHandle: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func cursorUpdate(with event: NSEvent) { NSCursor.resizeLeftRight.set() }
     override func mouseEntered(with event: NSEvent) { NSCursor.resizeLeftRight.set() }
-    override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+    override func mouseExited(with event: NSEvent) { if !dragging { NSCursor.arrow.set() } }
+
+    /// Right clicks go to the widget underneath, so its menu opens here too.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        if let type = NSApp.currentEvent?.type, type == .rightMouseDown || type == .otherMouseDown { return nil }
+        return super.hitTest(point)
+    }
 
     // Screen coordinates, so the window changing size under the pointer doesn't disturb the drag.
     override func mouseDown(with event: NSEvent) {
         start = NSEvent.mouseLocation
+        dragging = true
+        // Backup in case the mouse-up goes elsewhere: the drag must always end.
+        upMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            self?.finish()
+            return event
+        }
         onResize?(.began)
     }
 
     override func mouseDragged(with event: NSEvent) {
         let now = NSEvent.mouseLocation
-        onResize?(.moved(dx: now.x - start.x, dy: now.y - start.y))
+        onResize?(.moved(dx: now.x - start.x))
     }
 
-    override func mouseUp(with event: NSEvent) { onResize?(.ended) }
+    override func mouseUp(with event: NSEvent) { finish() }
+
+    private func finish() {
+        if let upMonitor { NSEvent.removeMonitor(upMonitor) }
+        upMonitor = nil
+        guard dragging else { return }
+        dragging = false
+        onResize?(.ended)
+        let inside = window.map { bounds.contains(convert($0.mouseLocationOutsideOfEventStream, from: nil)) } ?? false
+        (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+    }
 }

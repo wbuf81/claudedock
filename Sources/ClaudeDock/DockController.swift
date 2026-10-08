@@ -38,7 +38,7 @@ final class DockController {
     /// Counts grow and shrink animations, so one that was overtaken finishes quietly.
     private var generation = 0
     private var animating = false
-    /// One level above the Dock (which draws over floating windows), for the expanded widget.
+    /// One level above the Dock (which draws over floating windows), for the full widget.
     private static let aboveDock = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) + 1)
 
     init(model: AppModel, actions: WidgetActions) {
@@ -143,18 +143,18 @@ final class DockController {
         dragStart = nil
         guard let screen = NSScreen.screens.first, let frames else { return }
         // The glass, moved as far as the window was.
-        let glass = glassFrame.offsetBy(dx: widget.frame.minX - start.origin.x, dy: widget.frame.minY - start.origin.y)
+        let moved = glassFrame.offsetBy(dx: widget.frame.minX - start.origin.x, dy: widget.frame.minY - start.origin.y)
+        // The spot is the compact widget's: when the full one is shown, the compact one is the
+        // frame the full one grew from (this is also what `layout` places).
+        let glass = showingFull
+            ? WidgetPlacement.compactFrame(full: moved, size: frames.compact.size,
+                                           anchor: WidgetPlacement.anchor(compact: moved, visible: screen.visibleFrame, spot: nil))
+            : moved
         if let point = WidgetPlacement.snap(frame: glass, screen: screen.frame, visible: screen.visibleFrame,
                                             dockWidth: Self.dockWidth(on: screen)) {
             model.settings.widgetSpot = .snapped(point)
         } else {
-            // The saved spot is the compact widget's: when the full one is shown, the compact
-            // one lands where the full one grew from.
-            let spot = showingFull
-                ? WidgetPlacement.compactFrame(full: glass, size: frames.compact.size,
-                                               anchor: WidgetPlacement.anchor(compact: glass, visible: screen.visibleFrame, spot: nil))
-                : glass
-            model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: spot.origin, size: spot.size, screen: screen.frame))
+            model.settings.widgetSpot = .free(WidgetPlacement.offset(origin: glass.origin, size: glass.size, screen: screen.frame))
         }
         layout()
     }
@@ -198,16 +198,16 @@ final class DockController {
     /// the window's frame and the crossfade between the two sizes follow the pointer. On
     /// release, past halfway is full and short of it is compact.
     private func resize(_ phase: ResizePhase) {
-        guard let frames else { return }
         switch phase {
         case .began:
             settleNow()
+            guard let frames else { return }
             resizeStart = (windowFrame(frames.compact), windowFrame(frames.full), showingFull ? 1 : 0)
             fullHost.isHidden = false
             compactHost.isHidden = false
             widget.level = Self.aboveDock
-        case .moved(let dx, _):
-            guard let start = resizeStart else { return }
+        case .moved(let dx):
+            guard let start = resizeStart, let frames else { return }
             let span = max(start.full.width - start.compact.width, 1)
             let pull = frames.anchor.horizontal == .right ? -dx : dx
             let progress = min(max(start.progress + pull / span, 0), 1)
@@ -227,7 +227,6 @@ final class DockController {
         fullHost.alphaValue = progress
         compactHost.alphaValue = 1 - progress
         placeHandle(glass: Self.lerp(frames.compact, frames.full, progress), in: window)
-        if panel.isVisible { placePanel() }
     }
 
     private static func lerp(_ a: NSRect, _ b: NSRect, _ t: CGFloat) -> NSRect {
@@ -240,6 +239,7 @@ final class DockController {
     /// shrinks after it (in `layout`).
     private func animateSettle(from start: NSRect) {
         guard let frames else { return }
+        if panel.isVisible { placePanel() }
         generation += 1
         let current = generation
         let growing = showingFull
@@ -298,6 +298,8 @@ final class DockController {
     /// dragged it, or the bottom-right corner beside the Dock. The compact widget is placed and
     /// the full one grows out of it. All frames here are the glass; the window adds the band.
     private func layout() {
+        // A resize whose mouse-up got lost would otherwise block layout for good.
+        if resizeStart != nil, NSEvent.pressedMouseButtons & 1 == 0 { resize(.ended); return }
         guard let screen = NSScreen.screens.first else { return }
         let settings = model.settings
         let tileSize = UserDefaults(suiteName: "com.apple.dock")?.object(forKey: "tilesize") as? Double
@@ -404,7 +406,7 @@ final class DockController {
         let size = panelContent.fittingSize
         if panelContent.frame.size != size { panelContent.frame = NSRect(origin: .zero, size: size) }
         // Against where the widget is going, not where an animation has it right now.
-        let resting = frames.map { showingFull ? $0.full : $0.compact } ?? glassFrame
+        let resting = frames.map { windowFrame(showingFull ? $0.full : $0.compact) } ?? widget.frame
         panel.setFrame(WidgetPlacement.panelFrame(panel: size, widget: resting, visible: screen.visibleFrame),
                        display: true)
     }
