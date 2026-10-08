@@ -58,7 +58,7 @@ a real Mac, a real account, or a person. Tick what you checked and on what.
 ## In use
 
 - [ ] Reduce Motion: the widget doesn't animate, and an org in use shows a still glow.
-- [ ] Claude Code working: particles on its org within about 2 s, gone about 60 s after it
+- [ ] With Show the crab off, Claude Code working: particles on its org within about 2 s, gone about 60 s after it
       stops.
 - [ ] A desktop-app or browser chat on the primary org: particles there within one poll (3 minutes).
 - [ ] Each In-use effect and amount: Activity Monitor shows Claude Dock near 0% CPU.
