@@ -21,6 +21,8 @@ import Testing
         #expect(tool.contains("$PPID"))
         #expect(tool.hasSuffix(ClaudeCodeHooks.marker))
         #expect(ClaudeCodeHooks.command("end").contains("rm -f"))
+        // Parallel hooks of one session must not share a temporary name.
+        #expect(tool.contains(#""$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp""#))
     }
 
     @Test func installsIntoNothing() {
@@ -103,5 +105,43 @@ import Testing
         #expect(throws: HookFileError.self) { try file.connect() }
         #expect(try Data(contentsOf: settings) == original)
         #expect(!file.isConnected())
+    }
+
+    @Test func disconnectingNeverConnectedChangesNothing() throws {
+        let (settings, support) = temp()
+        let file = ClaudeCodeHookFile(settings: settings, support: support)
+        try file.disconnect()
+        #expect(!FileManager.default.fileExists(atPath: settings.path))
+        let original = Data("{\n  \"model\":   \"opus\"\n}".utf8)
+        try original.write(to: settings)
+        try file.disconnect()
+        #expect(try Data(contentsOf: settings) == original)
+    }
+
+    @Test func missingFileComesBackMissing() throws {
+        let (settings, support) = temp()
+        let file = ClaudeCodeHookFile(settings: settings, support: support)
+        try file.connect()
+        #expect(FileManager.default.fileExists(atPath: settings.path))
+        try file.disconnect()
+        #expect(!FileManager.default.fileExists(atPath: settings.path))
+    }
+
+    @Test func followsASymlinkedSettingsFile() throws {
+        let (settings, support) = temp()
+        let other = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        let real = other.appendingPathComponent("real.json")
+        let original = Data("{ \"model\": \"opus\" }".utf8)
+        try original.write(to: real)
+        try FileManager.default.createSymbolicLink(at: settings, withDestinationURL: real)
+        let file = ClaudeCodeHookFile(settings: settings, support: support)
+        try file.connect()
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: settings.path)) != nil)
+        let parsed = try JSONSerialization.jsonObject(with: Data(contentsOf: real)) as! [String: Any]
+        #expect(ClaudeCodeHooks.isInstalled(parsed))
+        try file.disconnect()
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: settings.path)) != nil)
+        #expect(try Data(contentsOf: real) == original)
     }
 }

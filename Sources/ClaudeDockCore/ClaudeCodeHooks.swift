@@ -24,7 +24,7 @@ public enum ClaudeCodeHooks {
         let folder = #"d="$HOME/Library/Application Support/Claude Dock/sessions""#
         let body = action == "end"
             ? #"rm -f "$d/$PPID""#
-            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.tmp" && mv -f "$d/$PPID.tmp" "$d/$PPID""#
+            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp" "$d/$PPID""#
         return "cat >/dev/null; \(folder); \(body) \(marker)"
     }
 

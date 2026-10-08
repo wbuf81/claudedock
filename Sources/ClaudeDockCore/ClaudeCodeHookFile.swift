@@ -21,38 +21,52 @@ public struct ClaudeCodeHookFile: Sendable {
         self.support = support
     }
 
+    /// The real file: a symlinked settings.json is followed, so writes keep the link.
+    private var target: URL { settings.resolvingSymlinksInPath() }
     private var backup: URL { support.appendingPathComponent("settings-before-connect.json") }
     private var written: URL { support.appendingPathComponent("settings-after-connect.json") }
+    /// Present when settings.json didn't exist before we connected, so disconnecting deletes it again.
+    private var wasMissing: URL { support.appendingPathComponent("settings-was-missing") }
 
-    public func isConnected() -> Bool { (try? read()).map(ClaudeCodeHooks.isInstalled) ?? false }
+    public func isConnected() -> Bool { (try? parse(try? Data(contentsOf: target))).map(ClaudeCodeHooks.isInstalled) ?? false }
 
     public func connect() throws {
-        let before = (try? Data(contentsOf: settings)) ?? Data()
-        let parsed = try read()
+        let before = try? Data(contentsOf: target)
+        let parsed = try parse(before)
         guard !ClaudeCodeHooks.isInstalled(parsed) else { return }
         let after = try encode(ClaudeCodeHooks.install(into: parsed))
-        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-        try before.write(to: backup, options: .atomic)
+        let fm = FileManager.default
+        try fm.createDirectory(at: support, withIntermediateDirectories: true)
+        try (before ?? Data()).write(to: backup, options: .atomic)
         try after.write(to: written, options: .atomic)
-        try FileManager.default.createDirectory(at: settings.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try after.write(to: settings, options: .atomic)
+        if before == nil { try Data().write(to: wasMissing, options: .atomic) } else { try? fm.removeItem(at: wasMissing) }
+        try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try after.write(to: target, options: .atomic)
     }
 
     public func disconnect() throws {
-        let current = (try? Data(contentsOf: settings)) ?? Data()
-        if let mine = try? Data(contentsOf: written), mine == current, let original = try? Data(contentsOf: backup) {
-            try original.write(to: settings, options: .atomic)
+        let fm = FileManager.default
+        let current = try? Data(contentsOf: target)
+        if let current, let mine = try? Data(contentsOf: written), mine == current {
+            if fm.fileExists(atPath: wasMissing.path) {
+                try fm.removeItem(at: target)
+            } else if let original = try? Data(contentsOf: backup) {
+                try original.write(to: target, options: .atomic)
+            } else {
+                try encode(ClaudeCodeHooks.remove(from: try parse(current))).write(to: target, options: .atomic)
+            }
         } else {
-            try encode(ClaudeCodeHooks.remove(from: try read())).write(to: settings, options: .atomic)
+            let parsed = try parse(current)
+            if ClaudeCodeHooks.isInstalled(parsed) {
+                try encode(ClaudeCodeHooks.remove(from: parsed)).write(to: target, options: .atomic)
+            }
         }
-        try? FileManager.default.removeItem(at: written)
-        try? FileManager.default.removeItem(at: backup)
+        for url in [written, backup, wasMissing] { try? fm.removeItem(at: url) }
     }
 
     /// The settings as a dictionary; a missing or empty file is an empty one.
-    private func read() throws -> [String: Any] {
-        guard let data = try? Data(contentsOf: settings),
-              !String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [:] }
+    private func parse(_ data: Data?) throws -> [String: Any] {
+        guard let data, !String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [:] }
         guard let object = try? JSONSerialization.jsonObject(with: data), let dictionary = object as? [String: Any] else {
             throw HookFileError.unreadable("\(settings.lastPathComponent) isn't plain JSON, so Claude Dock left it alone.")
         }
