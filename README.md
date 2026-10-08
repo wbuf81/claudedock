@@ -4,7 +4,8 @@
   <b>Your Claude plan usage, always in the corner of your screen.</b><br>
   A tiny Liquid Glass widget that sits beside the macOS Dock and shows, for every Claude
   organization you belong to, how much of this week and this 5-hour window you've used,
-  and whether you should be using it right now.
+  and whether you should be using it right now. A small crab perches on it and shows
+  what Claude Code is up to.
 </p>
 
 <p align="center">
@@ -19,7 +20,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.jpg">
-    <img src="docs/images/hero-light.jpg" alt="Claude Dock beside the macOS Dock, with its panel open above it" width="880">
+    <img src="docs/images/hero-light.jpg" alt="Claude Dock beside the macOS Dock, with a crab typing on top of Pikachu's ring and the panel open above" width="880">
   </picture>
 </p>
 
@@ -57,7 +58,7 @@ compact or full, and right-click → **Size** → **Compact** / **Full** does th
 for the panel at either size. Pointing at it changes nothing.
 
 <p align="center">
-  <img src="docs/images/compact.jpg" alt="The compact widget beside the Dock, and the full widget you can drag it to" width="880">
+  <img src="docs/images/compact.jpg" alt="The compact widget beside the Dock, and the full widget you drag it out to, each with the crab typing above Pikachu" width="880">
 </p>
 
 With one org, there's nothing to switch between, so you just get the ring, bar and dot.
@@ -79,7 +80,7 @@ Lots), or pinch on your trackpad over it to resize freely.
 
 ## The crab
 
-A small crab perches on the org Claude Code is signed into, mostly outside the glass: above
+A small pixel crab perches on the org Claude Code is signed into, mostly outside the glass: above
 the widget, below it when the widget is at a top position, and beside it on a vertical
 strip. It shows what Claude Code is doing:
 
@@ -88,6 +89,17 @@ strip. It shows what Claude Code is doing:
 - **Using a tool**: typing away while a command or edit runs.
 - **Waiting for you**: a red **!** when Claude Code needs your permission.
 - **Done**: celebrates for about 10 seconds, then goes back to idle.
+
+<p align="center">
+  <img src="docs/images/crab-moods.gif" alt="The five crab moods side by side, animated: resting, pondering in a thought bubble, typing at a keyboard, standing by a red exclamation mark, and celebrating" width="760">
+</p>
+
+The crab on the compact widget: typing while Claude Code works, then
+holding up a red **!** until you say yes, then cheering when it is done.
+
+<p align="center">
+  <img src="docs/images/compact-crab.gif" alt="The compact widget beside the Dock, animated: the crab types above Pikachu's ring, then shows a red exclamation mark, then celebrates" width="560">
+</p>
 
 It shows while a Claude Code session is open (or, unconnected, while Claude Code is
 writing), and hides when the widget's data is stale. Right-click → **Show the crab** turns it on or off. **Connect to Claude Code…** adds hooks
@@ -230,7 +242,7 @@ defaults delete com.wbuf81.claudedock
 ```sh
 ./test.sh                                                   # unit tests (Swift Testing)
 "build/Claude Dock.app/Contents/MacOS/ClaudeDock" --render DIR    # every demo state as PNGs
-"build/Claude Dock.app/Contents/MacOS/ClaudeDock" --showcase DIR  # the README images
+"build/Claude Dock.app/Contents/MacOS/ClaudeDock" --showcase DIR  # the README images, PNGs and the crab GIFs
 ```
 
 `ClaudeDockCore` holds all the logic (parsing, pace, stoplight, switch advice, placement,

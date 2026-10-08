@@ -43,6 +43,18 @@ extension EnvironmentValues {
     }
 }
 
+private struct CrabFrameKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    /// Which sprite frame the crab holds in image renders (live, it animates on its own).
+    var crabFrame: Int {
+        get { self[CrabFrameKey.self] }
+        set { self[CrabFrameKey.self] = newValue }
+    }
+}
+
 /// The rounded card both windows use. With `glass` on macOS 26 or later it's the system's
 /// clear Liquid Glass, tuned to match the Dock. Otherwise, or with Reduce Transparency or
 /// Increase Contrast on, a frosted material.

@@ -1,4 +1,6 @@
 import AppKit
+import ImageIO
+import UniformTypeIdentifiers
 import SwiftUI
 import ClaudeDockCore
 
@@ -32,8 +34,22 @@ enum Showcase {
         write(SocialCard(model: main), size: CGSize(width: 1280, height: 640), scheme: .dark, to: dir, "social-card.png")
         let side = model(scenarios[0])
         side.vertical = true
+        side.crabEdge = .left
         write(SideScene(model: side), size: CGSize(width: 1000, height: 820), scheme: .dark, to: dir, "vertical.png")
         write(CompactScene(model: main), size: CGSize(width: 1180, height: 330), scheme: .dark, to: dir, "compact.png")
+        writeCrabMoods(to: dir)
+        // The compact widget at work: 24 frames of each of three moods.
+        var compactFrames: [(CrabMood, Int)] = []
+        for mood in [CrabMood.tool, .permission, .done] { compactFrames += (0..<CrabSprites.frameCount).map { (mood, $0) } }
+        let compactModels = Dictionary(uniqueKeysWithValues: [CrabMood.tool, .permission, .done].map { mood -> (CrabMood, AppModel) in
+            var scenario = scenarios[0]
+            scenario.crab = mood
+            return (mood, model(scenario))
+        })
+        writeGIF(frames: compactFrames.count, size: CGSize(width: 560, height: 190), scale: 2, to: dir, "compact-crab.gif") { index in
+            let (mood, frame) = compactFrames[index]
+            return AnyView(CompactCrabScene(model: compactModels[mood]!).environment(\.crabFrame, frame))
+        }
         try? FileManager.default.removeItem(at: history)
         print("Showcase written to \(dir.path)")
     }
@@ -102,6 +118,35 @@ enum Showcase {
         }
         try? FileManager.default.removeItem(at: history)
         print("Matrix written to \(dir.path)")
+    }
+
+    /// `crab-moods.gif`: the five moods side by side on a dark card, captioned.
+    private static func writeCrabMoods(to dir: URL) {
+        let moods: [(CrabMood, String)] = [(.idle, "Idle"), (.thinking, "Thinking"), (.tool, "Using a tool"),
+                                           (.permission, "Waiting for you"), (.done, "Done")]
+        writeGIF(frames: CrabSprites.frameCount, size: CGSize(width: 880, height: 230), scale: 2, to: dir, "crab-moods.gif") { frame in
+            AnyView(CrabMoodsCard(moods: moods).environment(\.crabFrame, frame))
+        }
+    }
+
+    /// Renders `frames` views into a looping GIF at the crab's 0.07 s per frame.
+    private static func writeGIF(frames: Int, size: CGSize, scale: CGFloat, to dir: URL, _ name: String,
+                                 view: (Int) -> AnyView) {
+        guard let destination = CGImageDestinationCreateWithURL(dir.appendingPathComponent(name) as CFURL,
+                                                                UTType.gif.identifier as CFString, frames, nil) else { return }
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: CrabSprites.frameDuration]] as CFDictionary
+        for index in 0..<frames {
+            let framed = view(index)
+                .frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, .dark)
+                .environment(\.renderStyle, .showcase)
+            let renderer = ImageRenderer(content: framed)
+            renderer.scale = scale
+            guard let image = renderer.cgImage else { continue }
+            CGImageDestinationAddImage(destination, image, delay)
+        }
+        CGImageDestinationFinalize(destination)
     }
 
     private static func write<V: View>(_ view: V, size: CGSize, scheme: ColorScheme, to dir: URL, _ name: String) {
@@ -195,6 +240,49 @@ private struct CompactScene: View {
             WidgetView(model: model, actions: .none, compact: compact).fixedSize()
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.trailing, 12)
+        }
+    }
+}
+
+/// A tight crop of the compact widget beside the Dock, for the crab animation.
+private struct CompactCrabScene: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        ZStack {
+            Wallpaper(dark: true)
+            FakeDock()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.leading, -200)
+                .padding(.bottom, 40)
+            WidgetView(model: model, actions: .none, compact: true).fixedSize()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 24)
+                .padding(.bottom, 40)
+        }
+    }
+}
+
+/// The five crab moods in a row on a dark rounded card, each captioned.
+private struct CrabMoodsCard: View {
+    var moods: [(CrabMood, String)]
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.05, green: 0.07, blue: 0.09)
+            HStack(spacing: 16) {
+                ForEach(Array(moods.enumerated()), id: \.offset) { _, entry in
+                    VStack(spacing: 6) {
+                        CrabView(mood: entry.0, size: 120)
+                        Text(entry.1).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.9))
+                    }
+                    .frame(width: 154)
+                }
+            }
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RoundedRectangle(cornerRadius: 24).fill(Color(red: 0.11, green: 0.13, blue: 0.17)))
+            .padding(10)
         }
     }
 }

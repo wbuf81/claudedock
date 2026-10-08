@@ -37,7 +37,7 @@ enum DemoData {
                          readings: readings, claudeCodeOrg: pikachu.id, claudeCodeWorking: working, now: now, crab: crab)
         }
         return [
-            scenario("green-and-red", [
+            scenario("green-and-red", crab: .tool, [
                 r(pikachu, week: 55, weekReset: 64.5, session: 1, sessionReset: 4.8, fable: 31),
                 r(charizard, week: 95, weekReset: 33.5, fable: 2),
             ]),

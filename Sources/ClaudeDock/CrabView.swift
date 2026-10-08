@@ -4,18 +4,20 @@ import ClaudeDockCore
 
 /// The crab acting out a mood. Core Animation flips through the frames in the window server,
 /// so the app does no work per frame. With Reduce Motion, and in image renders (which can't
-/// draw Core Animation), it holds the mood's first frame.
+/// draw Core Animation), it hold one frame: the mood's first, or the one `crabFrame` picks.
 struct CrabView: View {
     var mood: CrabMood
     var size: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.renderStyle) private var renderStyle
+    @Environment(\.crabFrame) private var crabFrame
 
     var body: some View {
         Group {
             if reduceMotion || renderStyle != .live {
-                if let first = CrabSprites.frames(mood.rawValue).first {
-                    Image(decorative: first, scale: 1).resizable().interpolation(.high)
+                let frames = CrabSprites.frames(mood.rawValue)
+                if !frames.isEmpty {
+                    Image(decorative: frames[crabFrame % frames.count], scale: 1).resizable().interpolation(.high)
                 }
             } else {
                 CrabLayer(mood: mood)
