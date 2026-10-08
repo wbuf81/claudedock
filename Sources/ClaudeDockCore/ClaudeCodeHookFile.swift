@@ -14,7 +14,7 @@ public struct ClaudeCodeHookFile: Sendable {
 
     public static let defaultSettings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
     public static let defaultSupport = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/Claude Dock")
+        .appendingPathComponent("Library/Application Support/ClaudeDock")
 
     public init(settings: URL = defaultSettings, support: URL = defaultSupport) {
         self.settings = settings
@@ -28,10 +28,25 @@ public struct ClaudeCodeHookFile: Sendable {
     /// Present when settings.json didn't exist before we connected, so disconnecting deletes it again.
     private var wasMissing: URL { support.appendingPathComponent("settings-was-missing") }
 
-    public func isConnected() -> Bool { (try? parse(try? Data(contentsOf: target))).map(ClaudeCodeHooks.isInstalled) ?? false }
+    public func isConnected() -> Bool {
+        guard let data = try? read(), let parsed = try? parse(data) else { return false }
+        return ClaudeCodeHooks.isInstalled(parsed)
+    }
+
+    /// The settings bytes, or nil when there is no file. Any other failure (permissions…)
+    /// throws: an unreadable file is not a missing one, and must never be written over.
+    private func read() throws -> Data? {
+        do {
+            return try Data(contentsOf: target)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return nil
+        } catch {
+            throw HookFileError.unreadable("\(settings.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")) can't be read, so Claude Dock left it alone.")
+        }
+    }
 
     public func connect() throws {
-        let before = try? Data(contentsOf: target)
+        let before = try read()
         let parsed = try parse(before)
         guard !ClaudeCodeHooks.isInstalled(parsed) else { return }
         let after = try encode(ClaudeCodeHooks.install(into: parsed))
@@ -46,7 +61,7 @@ public struct ClaudeCodeHookFile: Sendable {
 
     public func disconnect() throws {
         let fm = FileManager.default
-        let current = try? Data(contentsOf: target)
+        let current = try read()
         if let current, let mine = try? Data(contentsOf: written), mine == current {
             if fm.fileExists(atPath: wasMissing.path) {
                 try fm.removeItem(at: target)

@@ -20,6 +20,10 @@ import Testing
         #expect(tool.contains("printf '%s %s\\n' tool"))
         #expect(tool.contains("$PPID"))
         #expect(tool.hasSuffix(ClaudeCodeHooks.marker))
+        // A failed write must never show as a hook error in Claude Code.
+        #expect(tool.hasSuffix("|| true \(ClaudeCodeHooks.marker)"))
+        #expect(tool.contains("Application Support/ClaudeDock/sessions"))
+        #expect(!tool.contains("Claude Dock"))
         #expect(ClaudeCodeHooks.command("end").contains("rm -f"))
         // Parallel hooks of one session must not share a temporary name.
         #expect(tool.contains(#""$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp""#))
@@ -105,6 +109,22 @@ import Testing
         #expect(throws: HookFileError.self) { try file.connect() }
         #expect(try Data(contentsOf: settings) == original)
         #expect(!file.isConnected())
+    }
+
+    // An unreadable file is not a missing one: never write over it, never delete it.
+    @Test func leavesAnUnreadableFileAlone() throws {
+        let (settings, support) = temp()
+        let original = Data("{ \"model\": \"opus\" }".utf8)
+        try original.write(to: settings)
+        let file = ClaudeCodeHookFile(settings: settings, support: support)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: settings.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: settings.path) }
+        guard (try? Data(contentsOf: settings)) == nil else { return }   // running as root: can't test
+        #expect(throws: HookFileError.self) { try file.connect() }
+        #expect(throws: HookFileError.self) { try file.disconnect() }
+        #expect(!file.isConnected())
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: settings.path)
+        #expect(try Data(contentsOf: settings) == original)
     }
 
     @Test func disconnectingNeverConnectedChangesNothing() throws {

@@ -15,6 +15,8 @@ import Testing
         #expect(Crab.parse("", pid: 1) == nil)
         #expect(Crab.parse("dancing 1800000000", pid: 1) == nil)
         #expect(Crab.parse("tool soon", pid: 1) == nil)
+        #expect(Crab.parse("tool inf", pid: 1) == nil)
+        #expect(Crab.parse("tool nan", pid: 1) == nil)
     }
 
     @Test func noSessionsNoCrab() {
@@ -67,5 +69,31 @@ import Testing
         #expect(Crab.fallbackMood(claudeCodeActiveAt: now.addingTimeInterval(-59), now: now) == .tool)
         #expect(Crab.fallbackMood(claudeCodeActiveAt: now.addingTimeInterval(-65), now: now) == .done)
         #expect(Crab.fallbackMood(claudeCodeActiveAt: now.addingTimeInterval(-70), now: now) == nil)
+    }
+
+    // MARK: Settling a mood whose Stop hook never came (Esc mid-turn)
+
+    func at(_ ago: TimeInterval) -> Date { now.addingTimeInterval(-ago) }
+
+    @Test func aWorkingMoodWithRecentTranscriptWritesStays() {
+        #expect(Crab.settle(.tool, sessions: [s(1, .tool, ago: 120)], claudeCodeActiveAt: at(10), now: now) == .tool)
+    }
+
+    @Test func aQuietTranscriptAndOldEventRests() {
+        #expect(Crab.settle(.tool, sessions: [s(1, .tool, ago: 120)], claudeCodeActiveAt: at(61), now: now) == .idle)
+        #expect(Crab.settle(.thinking, sessions: [s(1, .thinking, ago: 120)], claudeCodeActiveAt: nil, now: now) == .idle)
+    }
+
+    @Test func permissionNeverSettles() {
+        #expect(Crab.settle(.permission, sessions: [s(1, .permission, ago: 120)], claudeCodeActiveAt: at(61), now: now) == .permission)
+    }
+
+    @Test func aPromptJustSentStaysThinking() {
+        #expect(Crab.settle(.thinking, sessions: [s(1, .thinking, ago: 3)], claudeCodeActiveAt: at(300), now: now) == .thinking)
+    }
+
+    @Test func otherMoodsAndNilPassThrough() {
+        #expect(Crab.settle(.done, sessions: [s(1, .done, ago: 2)], claudeCodeActiveAt: nil, now: now) == .done)
+        #expect(Crab.settle(nil, sessions: [], claudeCodeActiveAt: nil, now: now) == nil)
     }
 }

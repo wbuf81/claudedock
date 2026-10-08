@@ -21,10 +21,10 @@ public enum ClaudeCodeHooks {
 
     /// The shell command for one action: a mood, or "end" to delete the session's file.
     public static func command(_ action: String) -> String {
-        let folder = #"d="$HOME/Library/Application Support/Claude Dock/sessions""#
+        let folder = #"d="$HOME/Library/Application Support/ClaudeDock/sessions""#
         let body = action == "end"
-            ? #"rm -f "$d/$PPID""#
-            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp" "$d/$PPID""#
+            ? #"rm -f "$d/$PPID" || true"#
+            : #"mkdir -p "$d" && printf '%s %s\n' \#(action) "$(date +%s)" > "$d/$PPID.$$.tmp" && mv -f "$d/$PPID.$$.tmp" "$d/$PPID" || true"#
         return "cat >/dev/null; \(folder); \(body) \(marker)"
     }
 

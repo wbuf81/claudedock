@@ -43,7 +43,7 @@ public enum Crab {
     public static func parse(_ text: String, pid: Int32) -> CrabSession? {
         let parts = text.split(whereSeparator: \.isWhitespace)
         guard parts.count == 2, let mood = CrabMood(rawValue: String(parts[0])),
-              let seconds = TimeInterval(parts[1]) else { return nil }
+              let seconds = TimeInterval(parts[1]), seconds.isFinite else { return nil }
         return CrabSession(pid: pid, mood: mood, time: Date(timeIntervalSince1970: seconds))
     }
 
@@ -78,6 +78,19 @@ public enum Crab {
         if quiet < InUse.claudeCodeQuiet { return .tool }
         if quiet < InUse.claudeCodeQuiet + doneLasts { return .done }
         return nil
+    }
+
+    /// With hooks, "thinking" or "tool" can outlive their turn: pressing Esc sends no Stop
+    /// hook. When the transcript has been quiet for a minute and the newest hook event is
+    /// a minute old too, nothing is happening: rest. "Permission" stays until something
+    /// else is written, since Claude Code sends no hook when you approve.
+    public static func settle(_ mood: CrabMood?, sessions: [CrabSession], claudeCodeActiveAt: Date?, now: Date) -> CrabMood? {
+        guard let mood else { return nil }
+        guard mood == .thinking || mood == .tool else { return mood }
+        let transcriptQuiet = claudeCodeActiveAt.map { now.timeIntervalSince($0) >= InUse.claudeCodeQuiet } ?? true
+        let newest = sessions.map(\.time).max()
+        let eventQuiet = newest.map { now.timeIntervalSince($0) >= InUse.claudeCodeQuiet } ?? true
+        return transcriptQuiet && eventQuiet ? .idle : mood
     }
 
     private static func current(_ session: CrabSession, now: Date) -> CrabMood {
